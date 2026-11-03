@@ -433,6 +433,7 @@ function freshState() {
     awaitNext: null, walkOff: false,
     season: null, seasonPending: false,
     quickSel: null,                            // quick game: which team slot we're picking ("Visitor"/"Home")
+    paCount: 0, coinFlipped: false, coinSide: null, coinResult: null, // matchup screen: coin toss / momentum
     teamSel: null, rosterSel: null
   };
 }
@@ -455,7 +456,7 @@ function startGame() {
   S.retiring = []; S.walkingOut = [];
   S.inning = 1; S.isBottom = false;
   S.outs = 0; S.balls = 0; S.strikes = 0;
-  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null;
+  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0;
   S.walkOff = false;
   S.lastSwing = null; S.lastCombo = null;
   S.stealPending = null; S.animating = false; S.pauseOpen = false; S.awaitNext = null;
@@ -510,6 +511,7 @@ function endPA(kind) { // kind: 'out' | 'walk' | 'hit'
     S.rotation[0] = null; S.baseRunners[0] = null;
   }
   S.batIdx = (S.batIdx + 1) % 9;
+  S.paCount++;
   S.balls = 0; S.strikes = 0;
 }
 
@@ -588,7 +590,18 @@ async function resolvePitch(type) {
   const bat = batter();
   const bPen = type === "Curve" ? -1 : type === "Slider" ? -2 : 0;
   const bRoll = await rollDie(20, "SWING \u2014 " + lastName(bat.name) + " (d20)", battingTeam() === userTeam());
-  const total = bRoll + skillMod(bat.B) + batterHandBonus(bat) + bPen - pm;
+  let momentum = 0;
+  if (S.coinSide) { // coin-toss winner gets +1 on their team's first swing of the game
+    const winner = S.coinSide === "user" ? userTeam() : (userTeam() === S.visitor ? S.home : S.visitor);
+    if (battingTeam() === winner) {
+      momentum = 1;
+      S.coinSide = null;
+      log("MOMENTUM: " + lastName(bat.name) + " carries the coin-toss boost (+1 swing)");
+    } else if (S.paCount >= 3) {
+      S.coinSide = null;
+    }
+  }
+  const total = bRoll + skillMod(bat.B) + batterHandBonus(bat) + bPen + momentum - pm;
   S.lastSwing.bRoll = bRoll;
   S.lastSwing.total = total;
   let result;
@@ -1028,7 +1041,7 @@ function renderTitle() {
     '<div class="title-main">PEN &amp; PAPER<br>BASEBALL</div>' +
     '<div class="title-sub">STATER RULES &middot; MLB TEAMS</div>' +
     '<button class="btn" data-action="start" style="flex:none;min-width:200px">QUICK GAME</button>' +
-    '<button class="btn ghost" data-action="season" style="flex:none;min-width:200px">SEASON MODE</button>' +
+    '<button class="btn ghost" data-action="profiles" style="flex:none;min-width:200px">SEASON MODE</button>' +
     '</div>';
 }
 
@@ -1186,27 +1199,34 @@ function renderRosterOrder() {
 function renderSeasonHub() {
   const s = S.season;
   const game = s.schedule[s.gameIdx];
-  const rows = findDivision(s.team).slice().sort((a, b) => {
-    const ra = s.records[a] || { w: 0, l: 0 }, rb = s.records[b] || { w: 0, l: 0 };
-    return (rb.w / ((rb.w + rb.l) || 1)) - (ra.w / ((ra.w + ra.l) || 1));
-  }).map(t => {
-    const r = s.records[t] || { w: 0, l: 0 };
-    const me = t === s.team;
-    return '<div class="mrow"><span class="pname"' + (me ? ' style="color:#ffd54a"' : '') + '>' + esc(t) + '</span><span class="attr' + (me ? '' : ' standard') + '">' + r.w + '-' + r.l + '</span></div>';
-  }).join("");
+  const week = Math.min(5, Math.floor(s.gameIdx / 6) + 1);
+  const latest = (s.news && s.news[0]) || null;
+  const newsHtml = latest
+    ? '<div class="menu"><div class="menu-title">THIS WEEK IN MLB \u2014 WEEK ' + latest.week + '</div>' +
+      latest.items.slice(0, 4).map(i => '<div class="mrow"><span class="pname">' + esc(i) + '</span></div>').join("") +
+      '<div class="mrow rrow" data-action="news-view"><span class="pname" style="color:#ffd54a">FULL MLB WIRE \u2192</span></div>' +
+      '</div>'
+    : '<div class="menu"><div class="menu-title">THIS WEEK IN MLB</div>' +
+      '<div class="mrow"><span class="pname">The league is quiet \u2014 results land here after game day.</span></div></div>';
   const mrow = s.markets.map(m => '<span class="attr">' + esc(MARKETS[m].name) + (MARKETS[m].tier === "major" ? ' (M)' : '') + '</span>').join(" ");
+  const oppR = s.records[game.opp];
   return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
-    '<div class="title-sub">SEASON ' + s.year + ' &middot; GAME ' + (s.gameIdx + 1) + ' OF ' + s.schedule.length + '</div>' +
+    '<div class="title-sub">YEAR ' + s.year + ' OF 5 \u2014 WEEK ' + week + ' \u2014 GAME ' + (s.gameIdx + 1) + ' OF ' + s.schedule.length + '</div>' +
     '<div class="menu">' +
-      '<div class="menu-title">' + esc(s.team) + ' &middot; ' + s.wins + '-' + s.losses + '</div>' +
-      '<div class="mrow"><span class="label">NEXT UP</span><span class="pname">' + (game.home ? 'vs' : '@') + ' ' + esc(game.opp) + '</span></div>' +
+      '<div class="menu-title">' + esc(s.team) + ' \u2014 ' + s.wins + '-' + s.losses + '</div>' +
+      '<div class="mrow"><span class="label">NEXT UP</span><span class="pname">' + (game.home ? 'vs' : '@') + ' ' + esc(game.opp) + ' (' + (oppR ? oppR.w + '-' + oppR.l : '') + ')</span></div>' +
       '<div class="mrow"><span class="label">YOU PLAY</span><span class="pname">' + (game.home ? 'HOME' : 'AWAY') + '</span></div>' +
-      '<div class="mrow"><span class="label">MARKETS</span><span>' + mrow + '</span></div>' +
       '<div class="mrow"><span class="label">TREASURY</span><span class="attr">$' + s.money.toFixed(1) + 'M</span></div>' +
+      '<div class="mrow"><span class="label">MARKETS</span><span>' + mrow + '</span></div>' +
     '</div>' +
-    '<div class="menu"><div class="menu-title">DIVISION STANDINGS</div>' + rows + '</div>' +
+    newsHtml +
     '<button class="btn" data-action="season-play" style="flex:none;min-width:220px">PLAY GAME ' + (s.gameIdx + 1) + '</button>' +
-    '<button class="btn ghost" data-action="quit" style="flex:none;min-width:220px">QUIT SEASON</button>' +
+    '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:6px 0">' +
+      '<button class="btn ghost" data-action="schedule-view" style="flex:0 0 auto">SCHEDULE</button>' +
+      '<button class="btn ghost" data-action="standings-view" style="flex:0 0 auto">STANDINGS</button>' +
+      '<button class="btn ghost" data-action="news-view" style="flex:0 0 auto">MLB WIRE</button>' +
+    '</div>' +
+    '<button class="btn ghost center" data-action="quit-season" style="flex:none;min-width:200px">SAVE &amp; PROFILES</button>' +
     '</div>';
 }
 
@@ -1222,8 +1242,161 @@ function renderOffseason() {
     '<div class="title-sub">THE OFF-SEASON &middot; YEAR ' + s.year + '</div>' +
     '<div class="menu">' + rows + '</div>' +
     '<div class="menu"><div class="menu-title">DRAFT \u2014 PICK A ROOKIE</div>' + (o.draftDone ? '<div class="mrow"><span class="pname">Draft complete</span></div>' : draft) + '</div>' +
-    '<button class="btn" data-action="new-season" ' + (o.draftDone ? '' : 'disabled') + ' style="flex:none;min-width:220px">BEGIN SEASON ' + (s.year + 1) + '</button>' +
+    '<button class="btn" data-action="new-season" ' + (o.draftDone ? '' : 'disabled') + ' style="flex:none;min-width:220px">' + (s.year >= MAX_SEASONS ? "SEASON COMPLETE \u2014 PROFILES" : "BEGIN SEASON " + (s.year + 1)) + '</button>' +
     '</div>';
+}
+
+/* ================= profiles, matchup, schedule, standings, news ================= */
+
+const MAX_PROFILES = 2;
+const MAX_SEASONS = 5;
+
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem("dlb-profiles")) || []; }
+  catch (e) { return []; }
+}
+
+function saveProfiles(list) {
+  try { localStorage.setItem("dlb-profiles", JSON.stringify(list.slice(0, MAX_PROFILES))); }
+  catch (e) {} // storage unavailable — the game still plays, just won't persist
+}
+
+function saveSeason() { // upsert the active season into the profile shelf
+  if (!S.season || !S.season.ready) return;
+  const list = loadProfiles();
+  const i = list.findIndex(p => p.id === S.season.id);
+  if (i >= 0) list[i] = S.season;
+  else list.push(S.season);
+  saveProfiles(list);
+}
+
+function renderProfiles() {
+  const list = loadProfiles();
+  const rows = list.map((p, i) =>
+    '<div class="menu"><div class="menu-title">' + esc(p.team) + (p.complete ? ' \u2014 COMPLETE' : '') + '</div>' +
+      '<div class="mrow"><span class="label">SEASON</span><span class="attr">YEAR ' + p.year + ' OF 5</span></div>' +
+      '<div class="mrow"><span class="label">RECORD</span><span class="attr">' + p.wins + '-' + p.losses + '</span></div>' +
+      '<div class="mrow"><span class="label">TREASURY</span><span class="attr">$' + p.money.toFixed(1) + 'M</span></div>' +
+      '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+        (p.ready ? '<button class="btn" data-action="load-profile" data-idx="' + i + '" style="flex:none">CONTINUE</button>' : '') +
+        '<button class="btn warn" data-action="del-profile" data-idx="' + i + '" style="flex:none">DELETE</button>' +
+      '</div></div>'
+  ).join("") || '<div class="menu"><div class="mrow"><span class="pname">No saved seasons yet \u2014 start one!</span></div></div>';
+  const full = list.length >= MAX_PROFILES;
+  return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
+    '<div class="title-sub">SEASON PROFILES (' + list.length + ' OF 2)</div>' +
+    rows +
+    (full ? '<div class="menu"><div class="mrow"><span class="pname">Profiles are full \u2014 delete one to start fresh.</span></div></div>'
+          : '<button class="btn" data-action="new-profile" style="flex:none;min-width:220px">NEW SEASON</button>') +
+    '<button class="btn ghost center" data-action="title" style="flex:none;min-width:200px">BACK TO TITLE</button>' +
+    '</div>';
+}
+
+function teamRating(t) {
+  const avg = arr => arr.length ? arr.reduce((a, c) => a + c, 0) / arr.length : 0;
+  return {
+    bat: avg(t.lineup.map(p => skillMod(p.B))),
+    fld: avg(Object.values(t.positions).map(p => skillMod(p.F))),
+    run: avg(t.lineup.map(p => skillMod(p.R))),
+    pit: skillMod(t.positions.P.P) - (t.positions.P.fatigue || 0)
+  };
+}
+
+function fmtMod(v) { return (v >= 0 ? "+" : "") + v.toFixed(1); }
+
+function renderMatchup() {
+  const s = S.season;
+  const game = s.schedule[s.gameIdx];
+  const oppName = game.opp;
+  const oppObj = S.userSide === "Home" ? S.visitor : S.home;
+  const meR = s.records[s.team], oR = s.records[oppName];
+  const u = teamRating(userTeam());
+  const o = teamRating(oppObj);
+  const formStr = t => {
+    const f = s.formAll[t] || [];
+    return f.length ? f.join("-") : "\u2014";
+  };
+  const cmp = (label, a, b) =>
+    '<div class="mrow"><span class="label">' + label + '</span>' +
+    '<span class="attr">' + a + '</span><span class="attr">' + b + '</span></div>';
+  let coin;
+  if (!S.coinFlipped) {
+    coin = '<div class="menu"><div class="menu-title">COIN TOSS</div>' +
+      '<div class="mrow"><span class="pname">The winner carries momentum: +1 to their first swing of the game.</span></div>' +
+      '<button class="btn" data-action="coin-flip" style="flex:none;min-width:220px">FLIP THE COIN</button></div>';
+  } else {
+    coin = '<div class="menu"><div class="menu-title">COIN TOSS</div>' +
+      '<div class="mrow"><span class="pname">' + esc(S.coinResult) + ' wins the toss' +
+      (S.coinSide === "user" ? ' \u2014 YOUR momentum!' : ' \u2014 their momentum.') + '</span></div></div>';
+  }
+  return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
+    '<div class="title-sub">GAME ' + (s.gameIdx + 1) + ' \u2014 ' + (game.home ? "HOME" : "AWAY") + '</div>' +
+    '<div class="menu"><div class="menu-title">' + esc(s.team) + ' vs ' + esc(oppName) + '</div>' +
+      cmp("RECORD", meR.w + "-" + meR.l, oR.w + "-" + oR.l) +
+      cmp("LAST 5", formStr(s.team), formStr(oppName)) +
+      cmp("RUNS F-A", s.runsFor + "-" + s.runsAgainst, "\u2014") +
+      cmp("TEAM BATTING", fmtMod(u.bat), fmtMod(o.bat)) +
+      cmp("TEAM FIELDING", fmtMod(u.fld), fmtMod(o.fld)) +
+      cmp("ACE PITCHING", fmtMod(u.pit), fmtMod(o.pit)) +
+      cmp("TEAM SPEED", fmtMod(u.run), fmtMod(o.run)) +
+    '</div>' +
+    coin +
+    '<button class="btn" data-action="play-ball" style="flex:none;min-width:220px">PLAY BALL</button>' +
+    '<button class="btn ghost center" data-action="matchup-back" style="flex:none;min-width:200px">BACK</button>' +
+    '</div>';
+}
+
+function renderSchedule() {
+  const s = S.season;
+  let html = '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
+    '<div class="title-sub">SCHEDULE \u2014 YEAR ' + s.year + '</div>';
+  s.schedule.forEach((g, i) => {
+    if (i % 6 === 0) html += '<div class="menu"><div class="menu-title">WEEK ' + (i / 6 + 1) + '</div>';
+    const played = i < s.gameIdx;
+    const res = played ? (s.form[i] === "W" ? "W" : "L") : (i === s.gameIdx ? "NEXT" : "");
+    const col = res === "W" ? "#7dd87d" : res === "L" ? "#e08a8a" : res === "NEXT" ? "#ffd54a" : "";
+    html += '<div class="mrow' + (i === s.gameIdx ? ' cutsel' : '') + '"><span class="pname">' + (i + 1) + '. ' + (g.home ? 'vs ' : '@ ') + esc(g.opp) + '</span>' +
+      '<span class="attr"' + (col ? ' style="color:' + col + '"' : '') + '>' + res + '</span></div>';
+    if (i % 6 === 5) html += '</div>';
+  });
+  if (s.schedule.length % 6 !== 0) html += '</div>';
+  html += '<button class="btn ghost center" data-action="hub" style="flex:none;min-width:200px">BACK TO CLUBHOUSE</button></div>';
+  return html;
+}
+
+function renderStandings() {
+  const s = S.season;
+  let html = '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
+    '<div class="title-sub">MLB STANDINGS \u2014 YEAR ' + s.year + '</div>';
+  Object.keys(LEAGUES).forEach(l => {
+    Object.keys(LEAGUES[l]).forEach(d => {
+      html += '<div class="menu"><div class="menu-title">' + esc(l + " \u2014 " + d) + '</div>';
+      html += LEAGUES[l][d].slice().sort((a, b) =>
+        (s.records[b].w / ((s.records[b].w + s.records[b].l) || 1)) - (s.records[a].w / ((s.records[a].w + s.records[a].l) || 1))
+      ).map(t => {
+        const r = s.records[t];
+        const me = t === s.team;
+        return '<div class="mrow"><span class="pname"' + (me ? ' style="color:#ffd54a"' : '') + '>' + esc(t) + '</span>' +
+          '<span class="attr' + (me ? '' : ' standard') + '">' + r.w + '-' + r.l + '</span></div>';
+      }).join("");
+      html += '</div>';
+    });
+  });
+  html += '<button class="btn ghost center" data-action="hub" style="flex:none;min-width:200px">BACK TO CLUBHOUSE</button></div>';
+  return html;
+}
+
+function renderNews() {
+  const s = S.season;
+  const weeks = (s.news || []).map(n =>
+    '<div class="menu"><div class="menu-title">WEEK ' + n.week + '</div>' +
+    n.items.map(i => '<div class="mrow"><span class="pname">' + esc(i) + '</span></div>').join("") +
+    '</div>'
+  ).join("") || '<div class="menu"><div class="mrow"><span class="pname">No wire yet \u2014 play a game and the league talks.</span></div></div>';
+  return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
+    '<div class="title-sub">MLB WIRE \u2014 YEAR ' + s.year + '</div>' +
+    weeks +
+    '<button class="btn ghost center" data-action="hub" style="flex:none;min-width:200px">BACK TO CLUBHOUSE</button></div>';
 }
 
 function renderFinal() {
@@ -1369,6 +1542,11 @@ function render() {
       S.screen === "rosterOrder" ? renderRosterOrder() :
       S.screen === "seasonHub" ? renderSeasonHub() :
       S.screen === "offseason" ? renderOffseason() :
+      S.screen === "profiles" ? renderProfiles() :
+      S.screen === "matchup" ? renderMatchup() :
+      S.screen === "schedule" ? renderSchedule() :
+      S.screen === "standings" ? renderStandings() :
+      S.screen === "news" ? renderNews() :
       renderFinal();
   }
 }
@@ -1378,22 +1556,26 @@ function render() {
 function startSeasonSetup(teamName) {
   const roster = rollRoster();
   S.season = {
+    id: String(Date.now()) + String(Math.floor(Math.random() * 1000)),
     team: teamName, year: 1, money: 40,
     markets: [TEAM_MARKET[teamName]],
     roster, minors: [],
     positions: {}, lineup: [],
     schedule: buildSchedule(teamName),
     gameIdx: 0, wins: 0, losses: 0,
+    form: [], formAll: {},
+    runsFor: 0, runsAgainst: 0,
+    news: [], newsWeek: 0,
     records: {}, npts: makeNPTs(teamName),
     cutSel: [], posSel: null,
-    off: null, seasons: 1
+    off: null, seasons: 1, ready: false, complete: false
   };
-  findDivision(teamName).forEach(t => { S.season.records[t] = { w: 0, l: 0 }; });
+  Object.keys(TEAM_MARKET).forEach(t => { S.season.records[t] = { w: 0, l: 0 }; });
   S.screen = "seasonRoll";
   render();
 }
 
-function playSeasonGame() {
+function prepSeasonGame() { // set up the matchup screen for the next game on the schedule
   const s = S.season;
   const game = s.schedule[s.gameIdx];
   const userTeamObj = buildGameTeam(s.team, s.lineup, s.positions);
@@ -1401,6 +1583,13 @@ function playSeasonGame() {
   const oppTeamObj = buildGameTeam(game.opp, oppAA.lineup, oppAA.positions);
   if (game.home) { S.home = userTeamObj; S.visitor = oppTeamObj; S.userSide = "Home"; }
   else { S.visitor = userTeamObj; S.home = oppTeamObj; S.userSide = "Visitor"; }
+  S.coinFlipped = false; S.coinSide = null; S.coinResult = null;
+  S.screen = "matchup";
+  render();
+}
+
+function playSeasonGame() {
+  prepSeasonGame();
   startGame();
 }
 
@@ -1416,12 +1605,74 @@ function recordSeasonResult(userWon) {
   const s = S.season;
   if (userWon) { s.wins++; s.records[s.team].w++; }
   else { s.losses++; s.records[s.team].l++; }
-  // the rest of the division plays too
-  findDivision(s.team).forEach(t => {
-    if (t === s.team || t === s.schedule[s.gameIdx].opp) return;
-    if (rint(1, 2) === 1) s.records[t].w++; else s.records[t].l++;
-  });
+  s.form.push(userWon ? "W" : "L");
+  const opp = s.schedule[s.gameIdx].opp;
+  pushForm(s.team, userWon);
+  pushForm(opp, !userWon);
+  const userSideScore = S.userSide === "Home" ? "Home" : "Visitor";
+  s.runsFor += S.score[userSideScore];
+  s.runsAgainst += S.score[userSideScore === "Home" ? "Visitor" : "Home"];
+  simLeagueWeek(s, opp); // the rest of the league plays on, in matched pairs
   s.gameIdx++;
+  maybeWeekNews();
+  saveSeason();
+}
+
+function pushForm(t, won) { // rolling last-5 form for every club
+  const s = S.season;
+  (s.formAll[t] = s.formAll[t] || []).push(won ? "W" : "L");
+  s.formAll[t] = s.formAll[t].slice(-5);
+}
+
+function simLeagueWeek(s, opp) {
+  const ids = Object.keys(TEAM_MARKET).filter(t => t !== s.team && t !== opp);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  for (let i = 0; i + 1 < ids.length; i += 2) {
+    const a = ids[i], b = ids[i + 1];
+    const aWins = rint(1, 2) === 1;
+    s.records[a][aWins ? "w" : "l"]++;
+    s.records[b][aWins ? "l" : "w"]++;
+    pushForm(a, aWins);
+    pushForm(b, !aWins);
+  }
+}
+
+/* weekly MLB wire: results, injuries and hot streaks from around the simmed league */
+function maybeWeekNews() {
+  const s = S.season;
+  if (s.gameIdx === 0 || s.gameIdx % 6 !== 0) return;
+  const week = s.gameIdx / 6;
+  if (s.news && s.news[0] && s.news[0].week >= week) return;
+  const items = [];
+  const others = Object.keys(TEAM_MARKET).filter(t => t !== s.team);
+  for (let g = 0, n = rint(2, 4); g < n; g++) {
+    const a = pick(others);
+    let b = pick(others);
+    while (b === a) b = pick(others);
+    const winner = rint(1, 2) === 1 ? a : b;
+    const w = rint(2, 9), l = rint(0, w - 1);
+    items.push("FINAL: " + winner + " " + w + ", " + (winner === a ? b : a) + " " + l);
+  }
+  if (rint(1, 3) > 1) {
+    const t = pick(others);
+    const roster = s.npts[t] && s.npts[t].lineup;
+    if (roster && roster.length) {
+      const p = pick(roster);
+      items.push("INJURY: " + p.name + " (" + t + ") \u2014 " + pick(["sore shoulder", "tight hamstring", "sprained ankle", "back stiffness"]) + ", out " + rint(1, 3) + " games");
+    }
+  }
+  const hot = pick(others);
+  const hp = s.npts[hot] && s.npts[hot].lineup && pick(s.npts[hot].lineup);
+  if (hp) items.push("HOT BAT: " + hp.name + " (" + hot + ") launched " + rint(2, 4) + " homers this week");
+  const arm = pick(others);
+  const ap = s.npts[arm] && s.npts[arm].positions && s.npts[arm].positions.P;
+  if (ap) items.push("HOT ARM: " + ap.name + " (" + arm + ") fired a " + pick(["two-hit shutout", "one-hitter", "12-strikeout complete game"]));
+  s.news = s.news || [];
+  s.news.unshift({ week, items });
+  s.news = s.news.slice(0, 8);
 }
 
 function finishSeason() {
@@ -1525,22 +1776,34 @@ function finishSeason() {
   for (let i = 0; i < 6; i++) crop.push(rollPlayer());
   crop.sort((a, b) => totalSkill(b) - totalSkill(a));
   s.off = { lines, draft: crop.slice(0, 5), draftDone: false, tier };
+  saveSeason();
   S.screen = "offseason";
   render();
 }
 
 function newSeason() {
   const s = S.season;
+  if (s.year >= MAX_SEASONS) { // profiles hold five seasons; completed ones stay on the shelf
+    s.complete = true;
+    saveSeason();
+    S.screen = "profiles";
+    S.season = null;
+    render();
+    return;
+  }
   s.year++;
   s.schedule = buildSchedule(s.team);
   s.gameIdx = 0; s.wins = 0; s.losses = 0;
-  findDivision(s.team).forEach(t => { s.records[t] = { w: 0, l: 0 }; });
+  s.form = []; s.formAll = {};
+  s.runsFor = 0; s.runsAgainst = 0;
+  Object.keys(TEAM_MARKET).forEach(t => { s.records[t] = { w: 0, l: 0 }; });
   s.off = null;
   // promote the best minor leaguer if roster is short
   if (s.roster.length < 12 && s.minors.length) {
     s.minors.sort((a, b) => totalSkill(b) - totalSkill(a));
     s.roster.push(s.minors.shift());
   }
+  saveSeason();
   S.screen = "seasonHub";
   render();
 }
@@ -1617,7 +1880,36 @@ document.getElementById("app").addEventListener("click", e => {
     S.screen = "select";
     render();
   }
-  else if (a === "season") { S.seasonPending = true; S.screen = "select"; S.teamSel = { label: "Your Team", stage: "league", league: null, division: null, team: null }; render(); }
+  else if (a === "profiles") { S.season = null; S.seasonPending = false; S.screen = "profiles"; render(); }
+  else if (a === "new-profile") { S.seasonPending = true; S.screen = "select"; S.teamSel = { label: "Your Team", stage: "league", league: null, division: null, team: null }; render(); }
+  else if (a === "load-profile") {
+    const p = loadProfiles()[parseInt(el.dataset.idx, 10)];
+    if (p) { S.season = p; S.screen = "seasonHub"; render(); }
+  }
+  else if (a === "del-profile") {
+    const list = loadProfiles();
+    list.splice(parseInt(el.dataset.idx, 10), 1);
+    saveProfiles(list);
+    render();
+  }
+  else if (a === "title") { S = freshState(); render(); }
+  else if (a === "hub") { S.screen = "seasonHub"; render(); }
+  else if (a === "schedule-view") { S.screen = "schedule"; render(); }
+  else if (a === "standings-view") { S.screen = "standings"; render(); }
+  else if (a === "news-view") { S.screen = "news"; render(); }
+  else if (a === "quit-season") { saveSeason(); S.season = null; S.screen = "profiles"; render(); }
+  else if (a === "season-play") prepSeasonGame();
+  else if (a === "coin-flip") {
+    const s = S.season;
+    if (!s || S.coinFlipped) return;
+    const opp = s.schedule[s.gameIdx].opp;
+    S.coinResult = pick([s.team, opp]);
+    S.coinSide = S.coinResult === s.team ? "user" : "cpu";
+    S.coinFlipped = true;
+    render();
+  }
+  else if (a === "play-ball") startGame();
+  else if (a === "matchup-back") { S.screen = "seasonHub"; render(); }
   else if (a === "ts-pick") tsPick(parseInt(el.dataset.idx, 10));
   else if (a === "ts-random") tsRandom();
   else if (a === "ts-back") tsBack();
@@ -1673,17 +1965,9 @@ document.getElementById("app").addEventListener("click", e => {
     if (j >= 0 && j < 9) { const t = S.season.lineup[i]; S.season.lineup[i] = S.season.lineup[j]; S.season.lineup[j] = t; }
     render();
   }
-  else if (a === "order-done") { S.screen = "seasonHub"; render(); }
+  else if (a === "order-done") { S.season.ready = true; saveSeason(); S.screen = "seasonHub"; render(); }
   else if (a === "season-next") {
     const s = S.season;
-    const oppSide = S.userSide === "Home" ? "Visitor" : "Home";
-    const won = S.score[S.userSide] > S.score[oppSide];
-    if (won) { s.wins++; s.records[s.team].w++; } else { s.losses++; s.records[s.team].l++; }
-    findDivision(s.team).forEach(t => {
-      if (t === s.team || t === s.schedule[s.gameIdx].opp) return;
-      if (rint(1, 2) === 1) s.records[t].w++; else s.records[t].l++;
-    });
-    s.gameIdx++;
     if (s.gameIdx >= s.schedule.length) finishSeason();
     else { S.screen = "seasonHub"; render(); }
   }
@@ -1699,6 +1983,7 @@ document.getElementById("app").addEventListener("click", e => {
         s.minors.push(s.roster.splice(low, 1)[0]);
       }
     }
+    saveSeason();
     render();
   }
   else if (a === "new-season") newSeason();

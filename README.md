@@ -24,7 +24,10 @@ Open the game in Safari, tap **Share**, then **Add to Home Screen**. It launches
 
 ## Season Mode
 
+- **Profiles**: up to 2 saved season profiles (kept in your browser), each running up to 5 years/seasons — start, continue, delete, and they survive closing the app.
 - Pick your MLB team, roll its 12-man roster, cut 3, assign positions, set the order — the CPU's 29 teams get their own rolled rosters.
-- A compressed 30-game MLB-style schedule (heavy on division rivals, plus the rest of the league and interleague play), home and away.
-- Standings update after each game (the rest of your division's results are simmed).
-- **The off-season**: fan-base markets grow/shrink by finish (MLB cities, with adjacency), income by record tier and market type, player salaries by skill totals, off-season events for last-place teams, a rookie draft, minor-league development, and aging rolls after a player's 5th season. Treasury is tracked across years.
+- A compressed 30-game MLB-style schedule (heavy on division rivals, plus the rest of the league and interleague play), home and away, split into 5 weeks.
+- **Matchup window** before every game: team-vs-team stat comparison, records and last-5 form, plus a coin toss — the winner's first swing of the game gets a momentum bump.
+- **Clubhouse**: schedule view (week by week, results filled in), full 30-team standings by division, and the **MLB Wire** — a weekly news digest of simmed scores, injuries and hot streaks from around the league.
+- Standings update after each game: the rest of the league plays on around you.
+- **The off-season**: fan-base markets grow/shrink by finish (MLB cities, with adjacency), income by record tier and market type, player salaries by skill totals, off-season events for last-place teams, a rookie draft, minor-league development, and aging rolls after a player's 5th season. Treasury is tracked across years — all saved into your profile.
