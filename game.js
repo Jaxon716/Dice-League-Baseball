@@ -1128,7 +1128,7 @@ function renderSeasonRoll() {
     '<div class="title-sub">SEASON MODE &middot; ROLL YOUR ROSTER</div>' +
     '<div class="menu-title">' + esc(s.team) + '</div>' +
     '<div class="menu">' + rows + '</div>' +
-    '<button class="btn" data-action="roster-cut" style="flex:none;min-width:220px">MANAGE ROSTER (CUT 3)</button>' +
+    '<button class="btn" data-action="go-roster-cut" style="flex:none;min-width:220px">MANAGE ROSTER (CUT 3)</button>' +
     '</div>';
 }
 
@@ -1638,7 +1638,8 @@ document.getElementById("app").addEventListener("click", e => {
   }
   else if (a === "continue") onContinue();
   else if (a === "rematch") rematch();
-  else if (a === "roster-cut") {
+  else if (a === "go-roster-cut") { S.screen = "rosterCut"; render(); }
+  else if (a === "cut-toggle") {
     const i = parseInt(el.dataset.idx, 10);
     const sel = S.season.cutSel;
     const at = sel.indexOf(i);
