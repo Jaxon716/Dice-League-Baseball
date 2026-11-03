@@ -1151,7 +1151,7 @@ function renderRosterCut() {
     const sel = s.cutSel.includes(i);
     return '<div class="mrow rrow' + (sel ? ' cutsel' : '') + '" data-action="cut-toggle" data-idx="' + i + '">' +
       '<span class="pname">' + esc(p.name) + ' (' + p.hand + ')</span>' +
-      '<span class="attr">B' + p.B + ' F' + p.F + ' P' + p.P + ' R' + p.R + ' \u2014 T' + totalSkill(p) + '</span></div>';
+      '<span class="attr">' + (sel ? '\u2713 CUT \u2014 ' : 'B' + p.B + ' F' + p.F + ' P' + p.P + ' R' + p.R + ' \u2014 T' + totalSkill(p)) + '</span></div>';
   }).join("");
   return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
     '<div class="title-sub">STEP 1 &middot; CUT 3 PLAYERS</div>' +
@@ -1163,19 +1163,25 @@ function renderRosterCut() {
 
 function renderRosterPos() {
   const s = S.season;
-  const assigned = Object.keys(s.positions).map(k =>
-    '<div class="mrow"><span class="pname">' + k + '</span><span class="attr">' + esc(s.positions[k].name) + '</span></div>'
-  ).join("");
+  const slots = POSITIONS.map(p => {
+    const occ = s.positions[p];
+    return '<div class="mrow rrow" data-action="pos-slot" data-pos="' + p + '"' + (occ ? ' style="background:#1c2415"' : '') + '>' +
+      '<span class="pname">' + p + ' \u2014 ' + (occ ? esc(occ.name) + ' <small style="color:#8fa3b8">(tap to release)</small>' : 'empty') + '</span>' +
+      (occ ? '<span class="attr" style="color:#7dd87d">\u2713</span>' : '') +
+      '</div>';
+  }).join("");
   const un = s.roster.filter(p => !Object.values(s.positions).includes(p)).map((p, i) =>
     '<div class="mrow rrow' + (s.posSel === p ? ' cutsel' : '') + '" data-action="pos-pick" data-pi="' + s.roster.indexOf(p) + '">' +
       '<span class="pname">' + esc(p.name) + ' (' + p.hand + ')</span>' +
-      '<span class="attr">B' + p.B + ' F' + p.F + ' P' + p.P + ' R' + p.R + '</span></div>'
+      '<span class="attr">' + (s.posSel === p ? '\u2713 PICKED \u2014 tap a position' : 'B' + p.B + ' F' + p.F + ' P' + p.P + ' R' + p.R) + '</span></div>'
   ).join("");
   return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
     '<div class="title-sub">STEP 2 &middot; ASSIGN POSITIONS</div>' +
-    '<div class="menu"><div class="menu-title">POSITIONS</div>' + (assigned || '<div class="mrow"><span class="pname">Tap a player, then a position</span></div>') +
-    (POSITIONS.map(p => s.positions[p] ? '' : '<div class="mrow rrow" data-action="pos-slot" data-pos="' + p + '"><span class="pname">' + p + ' \u2014 empty</span></div>').join("")) + '</div>' +
+    '<div class="menu"><div class="menu-title">POSITIONS</div>' +
+      '<div class="mrow"><span class="pname" style="color:#8fa3b8;font-weight:400">Tap a player, then a slot. Tap an occupied slot to release him.</span></div>' +
+      slots + '</div>' +
     '<div class="menu"><div class="menu-title">UNASSIGNED</div>' + (un || '<div class="mrow"><span class="pname">All assigned</span></div>') + '</div>' +
+    (s.savedRoster ? '<button class="btn ghost" data-action="back-to-cuts" style="flex:none;min-width:220px">\u25c2 REDO CUTS</button>' : '') +
     '<button class="btn" data-action="pos-done" ' + (Object.keys(s.positions).length === 9 ? '' : 'disabled') + ' style="flex:none;min-width:220px">CONTINUE</button>' +
     '</div>';
 }
@@ -1192,6 +1198,7 @@ function renderRosterOrder() {
   return '<div class="bigscreen" style="min-height:0;padding:6px 0">' +
     '<div class="title-sub">STEP 3 &middot; BATTING ORDER</div>' +
     '<div class="menu">' + rows + '</div>' +
+    '<button class="btn ghost" data-action="back-to-pos" style="flex:none;min-width:220px">\u25c2 POSITIONS</button>' +
     '<button class="btn" data-action="order-done" style="flex:none;min-width:220px">START SEASON</button>' +
     '</div>';
 }
@@ -1941,6 +1948,8 @@ document.getElementById("app").addEventListener("click", e => {
   }
   else if (a === "cuts-done") {
     const s = S.season;
+    s.savedRoster = s.roster.slice(); // kept so the cuts can be redone
+    s.savedCutSel = s.cutSel.slice();
     s.cutSel.sort((x, y) => y - x).forEach(i => s.roster.splice(i, 1));
     s.cutSel = [];
     S.screen = "rosterPos";
@@ -1953,6 +1962,20 @@ document.getElementById("app").addEventListener("click", e => {
     else delete S.season.positions[pos];
     render();
   }
+  else if (a === "back-to-cuts") { // rewind to the cut stage, players restored
+    const s = S.season;
+    if (s.savedRoster) {
+      s.roster = s.savedRoster.slice();
+      s.cutSel = s.savedCutSel.slice();
+      s.savedRoster = null;
+      s.savedCutSel = null;
+    }
+    s.positions = {};
+    s.posSel = null;
+    S.screen = "rosterCut";
+    render();
+  }
+  else if (a === "back-to-pos") { S.screen = "rosterPos"; render(); }
   else if (a === "pos-done") {
     const s = S.season;
     s.lineup = POSITIONS.map(p => s.positions[p]).sort((a, b) => b.B - a.B);
@@ -1965,7 +1988,14 @@ document.getElementById("app").addEventListener("click", e => {
     if (j >= 0 && j < 9) { const t = S.season.lineup[i]; S.season.lineup[i] = S.season.lineup[j]; S.season.lineup[j] = t; }
     render();
   }
-  else if (a === "order-done") { S.season.ready = true; saveSeason(); S.screen = "seasonHub"; render(); }
+  else if (a === "order-done") {
+    S.season.savedRoster = null;
+    S.season.savedCutSel = null;
+    S.season.ready = true;
+    saveSeason();
+    S.screen = "seasonHub";
+    render();
+  }
   else if (a === "season-next") {
     const s = S.season;
     if (s.gameIdx >= s.schedule.length) finishSeason();

@@ -135,6 +135,25 @@ body {
 
 .attr.standard { color: #8fa3b8; }
 
+/* clickable roster rows + selected highlight */
+.rrow {
+  background: #18212b;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.rrow:active { filter: brightness(1.2); }
+
+.cutsel {
+  border-color: #ffd54a;
+  background: #23301a;
+}
+
+.cutsel .pname { color: #ffd54a; }
+.cutsel .attr { color: #e6dfb0; }
+
 /* ---------- Log ---------- */
 .log {
   background: #12181f;
