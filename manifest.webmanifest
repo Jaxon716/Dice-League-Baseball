@@ -1,0 +1,14 @@
+{
+  "name": "Dice League Baseball",
+  "short_name": "Dice League",
+  "id": "./",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "icons": [
+    { "src": "icon-250.png", "sizes": "250x250", "type": "image/png" },
+    { "src": "icon-960.png", "sizes": "960x960", "type": "image/png" }
+  ]
+}

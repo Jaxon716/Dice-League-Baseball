@@ -1,0 +1,558 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0b0f14;
+  color: #eef2f5;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  width: 100%;
+  max-width: 430px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Scoreboard bar ---------- */
+.scorebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #000;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.teamcell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.abbr {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #fff;
+}
+
+.abbr.visitor { background: #1c3f94; }
+.abbr.home { background: #b81c24; }
+
+.scorenum {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.midinfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 64px;
+}
+
+.inn {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd54a;
+  letter-spacing: 1px;
+}
+
+.outdots { display: flex; gap: 4px; }
+
+.dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1px solid #888;
+  display: inline-block;
+}
+
+.dot.on { background: #ffd54a; border-color: #ffd54a; }
+
+/* ---------- Count row ---------- */
+.countrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #12181f;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.countbox { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+.countline { font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+.countline span { color: #ffd54a; }
+
+/* ---------- Matchup card ---------- */
+.matchup {
+  background: #12181f;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.mrow .label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #8fa3b8;
+  letter-spacing: 1px;
+  width: 62px;
+}
+
+.mrow .pname { font-weight: 700; }
+
+.attr {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd54a;
+  white-space: nowrap;
+}
+
+.attr.standard { color: #8fa3b8; }
+
+/* ---------- Log ---------- */
+.log {
+  background: #12181f;
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.logline {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #c8d4de;
+  word-break: break-word;
+}
+
+/* ---------- Buttons ---------- */
+.btnrow { display: flex; gap: 8px; }
+
+.btn {
+  flex: 1;
+  background: #1e7a34;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.btn:active { filter: brightness(1.2); }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn.ghost { background: #2a3340; }
+.btn.warn { background: #7a1e1e; }
+
+/* ---------- Steal prompt ---------- */
+.steal {
+  background: #241d05;
+  border: 1px solid #ffd54a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.steal-title { font-weight: 800; color: #ffd54a; letter-spacing: 1px; font-size: 14px; }
+.steal-runners { font-size: 13px; color: #c8d4de; }
+.steal-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.steal-btns .btn { flex: 1 1 40%; padding: 10px; font-size: 13px; }
+
+/* ---------- Menus ---------- */
+.menu {
+  background: #12181f;
+  border-radius: 10px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-title {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffd54a;
+  margin-bottom: 4px;
+}
+
+.menu .btn { width: 100%; text-align: left; padding: 12px 14px; font-weight: 600; letter-spacing: 0; }
+.menu .btn.center { text-align: center; }
+
+/* ---------- Title / Final ---------- */
+.bigscreen {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.title-main {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  line-height: 1.2;
+  color: #ffd54a;
+  text-shadow: 0 2px 0 #000;
+}
+
+.title-sub { color: #8fa3b8; font-size: 13px; letter-spacing: 2px; }
+
+.finalscore { font-size: 26px; font-weight: 800; }
+
+/* ---------- Overlays ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+
+.panel {
+  background: #12181f;
+  border-radius: 12px;
+  padding: 18px 16px;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-title {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffd54a;
+  margin-bottom: 6px;
+}
+
+.panel .msg { text-align: center; font-size: 14px; color: #c8d4de; }
+
+
+/* ---------- Dice ---------- */
+.dicerow { display: flex; gap: 10px; }
+
+.diebox {
+  flex: 1;
+  background: #12181f;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dielabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #8fa3b8;
+}
+
+.diebox.user .dielabel { color: #ffd54a; }
+
+.die {
+  width: 52px; height: 52px;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 900;
+  box-shadow: 0 3px 0 #b9b9b9;
+}
+
+.diebox.cpu .die {
+  background: #232b35;
+  color: #eef2f5;
+  box-shadow: 0 3px 0 #10141a;
+}
+
+.die.blank { color: #4a5766; }
+
+.comborow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #12181f;
+  border-radius: 10px;
+  padding: 8px;
+  font-weight: 800;
+  color: #ffd54a;
+  letter-spacing: 1px;
+}
+
+.comborow .die { width: 40px; height: 40px; font-size: 20px; }
+
+.combocombo { font-size: 14px; }
+
+/* ---------- Pick side ---------- */
+.vsrow { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.vsteam {
+  padding: 14px;
+  border-radius: 10px;
+  background: #12181f;
+  border: 1px solid #2a3340;
+  color: #eef2f5;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.vsteam:hover { border-color: #ffd54a; }
+.vsteam small { display: block; margin-top: 4px; font-weight: 600; color: #8fa3b8; font-size: 11px; letter-spacing: 1px; }
+
+
+/* ---------- Field ---------- */
+#fieldwrap {
+  background: #12181f;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+#fieldwrap svg { width: 100%; height: auto; display: block; }
+
+.def {
+  fill: #4a7bd6;
+  stroke: #0b0f14;
+  stroke-width: 1.5;
+}
+
+.deftext { fill: #9fb6d8; font-size: 9px; font-weight: 700; }
+
+.off {
+  fill: #ffd54a;
+  stroke: #7a5c00;
+  stroke-width: 1.5;
+  transition: transform 0.7s ease;
+}
+
+#ball { fill: #fff; stroke: #777; stroke-width: 1; }
+
+
+/* ---------- Field stage ---------- */
+#fieldstage { position: relative; }
+
+.rollbtn { flex: 1; }
+.pausebtn { flex: 0 0 52px; font-size: 18px; }
+
+/* ---------- Players ---------- */
+.player { overflow: visible; }
+
+.player .jersey { fill: var(--p); stroke: var(--s); stroke-width: 1.2; }
+.player .cap { fill: var(--s); }
+
+.leg1, .leg2, .bat, .player .body {
+  transform-box: fill-box;
+}
+
+.leg1 { transform-origin: 50% 5%; }
+.leg2 { transform-origin: 50% 5%; }
+
+.running .leg1 { animation: legs1 0.28s infinite; }
+.running .leg2 { animation: legs2 0.28s infinite; }
+
+@keyframes legs1 { 50% { transform: rotate(38deg); } }
+@keyframes legs2 { 50% { transform: rotate(-38deg); } }
+
+.player .body { transform-origin: 50% 100%; }
+
+.catchpop { animation: catchpop 0.5s ease; }
+@keyframes catchpop { 40% { transform: scale(1.45); } }
+
+.throwing { animation: throwlean 0.5s ease; }
+@keyframes throwlean { 35% { transform: rotate(14deg); } }
+
+.bat {
+  opacity: 0;
+  transform: rotate(38deg);
+  transform-origin: 50% 100%;
+  transition: opacity 0.2s;
+}
+
+.atbat .bat { opacity: 1; }
+
+.swing .bat { animation: batswing 0.42s ease; }
+@keyframes batswing { 30% { transform: rotate(-115deg); } }
+
+.swingmiss .bat { animation: batmiss 0.56s ease; }
+@keyframes batmiss { 40% { transform: rotate(155deg); } }
+
+.swingtip .bat { animation: battip 0.3s ease; }
+@keyframes battip { 45% { transform: rotate(-55deg); } }
+
+/* ---------- Outcome banners ---------- */
+.banner {
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0;
+  pointer-events: none;
+  padding: 12px 28px;
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: 2px;
+  border-radius: 12px;
+  z-index: 6;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  animation: bannerpop 1.3s ease forwards;
+  white-space: nowrap;
+}
+
+.b-strike { background: #b3241f; }
+.b-ball { background: #2a7d3f; }
+.b-foul { background: #7a5c1e; }
+.b-contact { background: #c88540; color: #111; }
+.b-out { background: #8f1d1a; }
+.b-walk { background: #1d5c8f; }
+.b-hit { background: #e6a417; color: #111; }
+.b-hr { background: #ffd54a; color: #111; font-size: 30px; }
+.b-safe { background: #2e7d32; }
+.b-caught { background: #b3241f; }
+
+@keyframes bannerpop {
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+}
+/* ---------- compact fit on one screen ---------- */
+#app { gap: 8px; padding: 8px; }
+
+.scorebar { padding: 6px 8px; }
+.scorenum { font-size: 18px; }
+
+.countrow { padding: 8px 10px; align-items: center; }
+.countrow .countbox { min-width: 0; flex: 1; }
+.countrow .countline {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+.countrow .die { width: 28px; height: 28px; font-size: 14px; border-radius: 7px; box-shadow: 0 2px 0 #b9b9b9; }
+.countrow .diebox.cpu .die { box-shadow: 0 2px 0 #10141a; }
+.countrow .dielabel { font-size: 8px; }
+.countrow .diebox { padding: 2px 4px; gap: 3px; }
+
+.log { padding: 8px 10px; min-height: 48px; }
+.logline { font-size: 11px; line-height: 1.45; }
+
+.rollbtn { padding: 10px; font-size: 14px; letter-spacing: 0.5px; }
+.pausebtn { padding: 10px 0; font-size: 15px; }
+.steal-btns .btn { padding: 8px; font-size: 12px; }
+.steal { padding: 8px 10px; }
+.steal-title { font-size: 12px; }
+.steal-runners { font-size: 11px; }
+
+/* ---------- broadcast bar ---------- */
+.tvbar {
+  background: #000;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tvrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #ffd54a;
+  text-transform: uppercase;
+}
+
+.tvrow .tvstat { color: #ffd54a; }
+
+.tvscore {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 2px 0;
+}
+
+.tvteam { display: flex; align-items: center; gap: 6px; flex: 1; }
+
+.tvcount { font-size: 26px; font-weight: 900; color: #ffd54a; text-align: center; line-height: 1; }
+
+.tvinn {
+  font-size: 9px;
+  font-weight: 700;
+  color: #8fa3b8;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.tvsmall {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  color: #c8d4de;
+}
+
+.tvscore { margin: 4px 0; }
+
+.tvdots { display: flex; align-items: center; gap: 4px; }
+.tvdots .dot { width: 7px; height: 7px; }
+
+/* compact dice strip */
+.dicerow .diebox { padding: 3px 8px; gap: 3px; flex-direction: row; }
+.dicerow .dielabel { font-size: 8px; }
+.dicerow .die { width: 24px; height: 24px; font-size: 12px; border-radius: 6px; box-shadow: 0 2px 0 #b9b9b9; }
+.dicerow .diebox.cpu .die { box-shadow: 0 2px 0 #10141a; }
+.comborow { padding: 6px; gap: 8px; }
+.comborow .die { width: 22px; height: 22px; font-size: 12px; }
+.combocombo { font-size: 11px; }
