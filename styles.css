@@ -441,7 +441,10 @@ body {
 @keyframes batswing { 30% { transform: rotate(-115deg); } }
 
 .swingmiss .bat { animation: batmiss 0.56s ease; }
-@keyframes batmiss { 40% { transform: rotate(155deg); } }
+@keyframes batmiss {
+  28% { transform: rotate(-128deg); }
+  48% { transform: rotate(-98deg); }
+}
 
 .swingtip .bat { animation: battip 0.3s ease; }
 @keyframes battip { 45% { transform: rotate(-55deg); } }

@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "26";
+const GAME_VERSION = "27";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -1156,7 +1156,11 @@ async function runRunners(fb, x, pre) { // animates every figure from its PRE-ad
     const land = i + (i === 0 ? fb : rF);
     const scored = land >= 4; // an advance that reaches home is a run — nobody wraps past it
     const tgt = scored ? -1 : land - 1;
-    jobs.push(runRunner(el, runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt), d).then(() => {
+    // a scoring batter (a home run) trots the whole diamond: plate → 1st → 2nd → 3rd → home
+    const path = (i === 0 && scored)
+      ? [[batBoxPt(), P.b[0]], [P.b[0], P.b[1]], [P.b[1], P.b[2]], [P.b[2], P.home]]
+      : runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt);
+    jobs.push(runRunner(el, path, d).then(() => {
       if (scored) walkToDugout(fig, P.home); // finished his run home — now to his own seat
     }));
   }
