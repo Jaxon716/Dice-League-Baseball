@@ -425,6 +425,10 @@ body {
 .catchpop { animation: catchpop 0.5s ease; }
 @keyframes catchpop { 40% { transform: scale(1.45); } }
 
+/* the fielder's glove comes up whenever he makes a catch */
+.glove { opacity: 0; transition: opacity 0.12s; }
+.catchpop .glove { opacity: 1; }
+
 .throwing { animation: throwlean 0.5s ease; }
 @keyframes throwlean { 35% { transform: rotate(14deg); } }
 

@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "29";
+const GAME_VERSION = "30";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -303,6 +303,10 @@ function jersey(id, cls, withBat) {
     '<rect class="jersey" x="-4.5" y="-3.5" width="9" height="7.5" rx="1.5"/>' +
     '<circle cx="0" cy="-6" r="2.8" fill="' + skin + '"/>' +
     '<path class="cap" d="M-2.8 -6.6 A2.8 2.8 0 0 1 2.8 -6.6 Z"/>' +
+    '<g class="glove">' +
+      '<ellipse cx="4" cy="-3.4" rx="2" ry="2.4" fill="#7a4a1e" stroke="#3d2410" stroke-width="0.4"/>' +
+      '<path d="M2.4 -4.6 Q4 -6 5.6 -4.6" fill="none" stroke="#3d2410" stroke-width="0.4"/>' +
+    '</g>' +
     '</g></g>';
 }
 
@@ -504,6 +508,21 @@ function ballTo(from, to, dur) {
     b.style.opacity = "0";
     res();
   });
+}
+
+async function ballArc(from, to, dur, h) { // the ball sails through the air in a hump
+  const b = document.getElementById("ball");
+  if (!b) { await wait(dur); return; }
+  const steps = 8;
+  const cx = (from[0] + to[0]) / 2;
+  const cy = (from[1] + to[1]) / 2 - (h || 70);
+  const px = t => (1 - t) * (1 - t) * from[0] + 2 * (1 - t) * t * cx + t * t * to[0];
+  const py = t => (1 - t) * (1 - t) * from[1] + 2 * (1 - t) * t * cy + t * t * to[1];
+  b.style.opacity = "1";
+  for (let i = 0; i < steps; i++) {
+    await glide(b, i === 0 ? from : [px(i / steps), py(i / steps)], [px((i + 1) / steps), py((i + 1) / steps)], dur / steps);
+  }
+  b.style.opacity = "0";
 }
 
 function catchAt(pos, defId, dur) {
@@ -860,7 +879,7 @@ async function resolvePitch(type) {
   if (result === "Home Run") {
     showBanner("HOMERUN!", "hr");
     S.stealTry = null;
-    await ballTo(P.home, crowdPt(), 750);
+    await ballArc(P.home, crowdPt(), 900, 130); // it sails high into the crowd
     log("HOME RUN! " + bat.name);
     await adv(4);
     endPA("hit");
@@ -902,14 +921,16 @@ async function resolveGroundBall(bat, pos) {
   const err = fRoll === 1;
   log("GROUND BALL to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (fm ? (fm > 0 ? "+" : "") + fm : "") + " vs " + target + (err ? " \u2014 ERROR!" : ""));
   const spot = getDefPt(pos);
-  await ballTo(P.home, spot, 500);
-  pop("def" + pos, "catchpop"); // he fields it cleanly
+  // the grounder skips along the grass while the fielder charges in to meet it
+  const meet = [spot[0] + (P.home[0] - spot[0]) * 0.12, spot[1] + (P.home[1] - spot[1]) * 0.12];
+  await Promise.all([moveDef(pos, meet, 450), ballTo(P.home, meet, 450)]);
+  pop("def" + pos, "catchpop"); // glove up — he fields it cleanly
 
   if (err) {
     showBanner("ERROR!", "foul");
     log("ERROR by " + pos + " \u2014 he bobbles it and has to chase it down; the batter takes first and every runner moves up one base safely");
-    const drop = grassGap(spot);
-    await ballTo(spot, drop, 300); // the ball squirts away from him
+    const drop = grassGap(meet);
+    await ballTo(meet, drop, 300); // the ball squirts away from him
     showBallAt(drop);
     await moveDef(pos, drop, 450); // and he goes after it
     hideBall();
@@ -925,7 +946,7 @@ async function resolveGroundBall(bat, pos) {
       pop("def" + pos, "catchpop"); // he just steps on his own bag with the ball
     } else {
       moveDef("1B", basePt(0), 350); // the first baseman breaks for the bag as the throw travels
-      await ballTo(spot, basePt(0), 350); // fires to first
+      await ballTo(meet, basePt(0), 350); // fires to first
       pop("def1B", "catchpop"); // and he takes it there
     }
     S.outs++;
@@ -948,7 +969,7 @@ async function resolveFlyBall(bat, pos, stealRunner) {
   const caught = fRoll !== 1 && (fRoll + fm) > FB_CATCH;
   log("FLY BALL to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (caught ? " \u2014 CAUGHT!" : " \u2014 dropped in!"));
   const land = caught ? getDefPt(pos) : grassGap(getDefPt(pos), 0.6);
-  await ballTo(P.home, land, 600);
+  await ballArc(P.home, land, 720, 95); // the fly ball sails through the air
   if (caught) {
     pop("def" + pos, "catchpop");
     showBanner("OUT!", "out");
@@ -987,7 +1008,7 @@ async function resolveLineDrive(bat, pos, stealRunner) {
   const caught = fRoll !== 1 && (fRoll + fm) > LD_CATCH;
   log("LINE DRIVE to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (caught ? " \u2014 SNAGGED!" : " \u2014 through the gap!"));
   const land = caught ? getDefPt(pos) : grassGap(getDefPt(pos), 0.6);
-  await ballTo(P.home, land, 600);
+  await ballArc(P.home, land, 560, 26); // the liner zips on a flat arc
   if (caught) {
     pop("def" + pos, "catchpop");
     showBanner("OUT!", "out");
