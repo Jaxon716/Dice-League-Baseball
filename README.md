@@ -14,7 +14,7 @@ Open the game in Safari, tap **Share**, then **Add to Home Screen**. It launches
 
 ## Stater's Rules (implemented)
 
-- **Teams**: each MLB club gets a rolled 12-man roster — 3d6 per skill (Batting, Fielding, Pitching, Running) mapped to modifiers (3→−3 … 18→+3), plus a handedness roll (R/L/switch). You cut 3 players, assign all 9 positions, and set the batting order. CPU clubs are auto-managed non-player teams.
+- **Teams**: each club's 12-man roster uses the real 2026 MLB names (and batting hands), but the dice still roll every player's B/F/P/R — 3d6 per skill mapped to modifiers (3→−3 … 18→+3). You cut 3 players, assign all 9 positions, and set the batting order. CPU clubs are auto-managed, lining up real positions first. The rookie draft pool stays fully generated.
 - **At-bat**: pitcher picks fastball/curve/slider and rolls 1d20 + Pitching vs targets 6/8/10 (fail = ball). Pitcher fatigue: from the 4th inning on, 1-in-6 per inning to lose a Pitching point.
 - **Swing**: batter rolls 1d20 + Batting − Pitching (curve −1, slider −2, platoon +1). Natural 1 = strike, natural 20 = batted ball. Chart: 1–8 strike, 9–10 foul (never strike three), 11–15 ground ball, 16–18 fly ball, 19 line drive, 20 home run.
 - **Batted balls**: 1d6 direction charts for righty/lefty hitters; fielders roll to catch (FB > 4, LD > 14) and to throw using Stater's throw charts; forced outs, −1 on tag plays, errors on natural 1s advance everyone an extra base safely.

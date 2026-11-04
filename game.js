@@ -127,6 +127,42 @@ const FIRST_NAMES = ["Mike", "Jake", "Tyler", "Marcus", "Derek", "Chris", "Andre
 const LAST_NAMES = ["Medlen", "Nunez", "Carter", "Hayes", "Bishop", "Ortega", "Sloan", "Dooley", "Pratt", "Vance",
   "Whitlock", "Barrett", "Quinn", "Larkin", "Moss", "Delgado", "Fraser", "Holt", "Cobb", "Ruth", "Aaron", "Banks"];
 
+/* Real MLB rosters: [name, bats, natural position] per club —
+   the dice still roll every player's B/F/P/R per Stater's rules.
+   The rookie draft pool stays fully generated (rollPlayer). */
+const TEAM_ROSTERS = {
+  "New York Yankees": [["Aaron Judge","R","OF"],["Giancarlo Stanton","R","DH"],["Trent Grisham","L","OF"],["Cody Bellinger","L","OF"],["Ben Rice","L","1B"],["Jazz Chisholm Jr.","L","2B"],["Anthony Volpe","R","SS"],["DJ LeMahieu","R","3B"],["Austin Wells","L","C"],["Max Fried","L","P"],["Carlos Rodón","L","P"],["Luke Weaver","R","P"]],
+  "Boston Red Sox": [["Carlos Narváez","R","C"],["Triston Casas","L","1B"],["Kristian Campbell","R","2B"],["Trevor Story","R","SS"],["Alex Bregman","R","3B"],["Jarren Duran","L","OF"],["Roman Anthony","L","OF"],["Wilyer Abreu","L","OF"],["Masataka Yoshida","L","DH"],["Garrett Crochet","L","P"],["Brayan Bello","R","P"],["Aroldis Chapman","L","P"]],
+  "Baltimore Orioles": [["Adley Rutschman","S","C"],["Ryan Mountcastle","R","1B"],["Jackson Holliday","L","2B"],["Gunnar Henderson","L","SS"],["Jordan Westburg","R","3B"],["Tyler O'Neill","L","OF"],["Colton Cowser","L","OF"],["Heston Kjerstad","L","OF"],["Ryan O'Hearn","L","DH"],["Zach Eflin","R","P"],["Dean Kremer","R","P"],["Félix Bautista","R","P"]],
+  "Tampa Bay Rays": [["Danny Jansen","R","C"],["Jonathan Aranda","L","1B"],["Brandon Lowe","L","2B"],["Carson Williams","R","SS"],["Junior Caminero","R","3B"],["Yandy Díaz","R","DH"],["Josh Lowe","L","OF"],["Chandler Simpson","L","OF"],["Jake Mangum","L","OF"],["Christopher Morel","R","OF"],["Shane Baz","R","P"],["Ryan Pepiot","R","P"]],
+  "Toronto Blue Jays": [["Alejandro Kirk","R","C"],["Vladimir Guerrero Jr.","R","1B"],["Andrés Giménez","L","2B"],["Bo Bichette","R","SS"],["Ernie Clement","R","3B"],["George Springer","R","OF"],["Daulton Varsho","L","OF"],["Anthony Santander","S","OF"],["Nathan Lukes","L","OF"],["Kevin Gausman","R","P"],["Trey Yesavage","R","P"],["Jeff Hoffman","R","P"]],
+  "Detroit Tigers": [["Jake Rogers","R","C"],["Spencer Torkelson","R","1B"],["Gleyber Torres","R","2B"],["Colt Keith","L","DH"],["Javier Báez","R","SS"],["Zach McKinstry","L","3B"],["Riley Greene","L","OF"],["Parker Meadows","L","OF"],["Kerry Carpenter","L","OF"],["Tarik Skubal","L","P"],["Casey Mize","R","P"],["Tyler Holton","L","P"]],
+  "Cleveland Guardians": [["Bo Naylor","L","C"],["Carlos Santana","S","1B"],["Daniel Schneemann","L","2B"],["Gabriel Arias","R","SS"],["José Ramírez","S","3B"],["Kyle Manzardo","L","DH"],["Steven Kwan","L","OF"],["Nolan Jones","R","OF"],["Chase DeLauter","L","OF"],["Tanner Bibee","R","P"],["Gavin Williams","R","P"],["Emmanuel Clase","R","P"]],
+  "KC Royals": [["Salvador Perez","R","C"],["Vinnie Pasquantino","L","1B"],["Michael Massey","L","2B"],["Bobby Witt Jr.","R","SS"],["Maikel Garcia","R","3B"],["Jac Caglianone","L","DH"],["Kyle Isbel","R","OF"],["MJ Melendez","L","OF"],["Drew Waters","S","OF"],["Seth Lugo","R","P"],["Cole Ragans","L","P"],["Carlos Estévez","R","P"]],
+  "Chicago White Sox": [["Edgar Quero","R","C"],["Miguel Vargas","R","1B"],["Lenyn Sosa","R","2B"],["Colson Montgomery","L","SS"],["Chase Meidroth","R","3B"],["Luis Robert Jr.","R","OF"],["Andrew Benintendi","L","OF"],["Brooks Baldwin","R","OF"],["Kyle Teel","R","DH"],["Shane Smith","R","P"],["Davis Martin","R","P"],["Grant Taylor","R","P"]],
+  "Minnesota Twins": [["Ryan Jeffers","R","C"],["Kody Clemens","L","1B"],["Brooks Lee","S","2B"],["Royce Lewis","R","3B"],["Carlos Correa","R","SS"],["Byron Buxton","R","OF"],["Matt Wallner","L","OF"],["Trevor Larnach","L","OF"],["DaShawn Keirsey","L","OF"],["Joe Ryan","R","P"],["Pablo López","R","P"],["Cole Sands","R","P"]],
+  "Houston Astros": [["Yainer Díaz","R","C"],["Christian Walker","R","1B"],["Jose Altuve","R","2B"],["Jeremy Peña","R","SS"],["Isaac Paredes","R","3B"],["Yordan Alvarez","L","DH"],["Jake Meyers","R","OF"],["Mauricio Dubón","R","OF"],["Cam Smith","R","OF"],["Framber Valdez","L","P"],["Hunter Brown","R","P"],["Josh Hader","L","P"]],
+  "Texas Rangers": [["Jonah Heim","S","C"],["Jake Burger","R","1B"],["Marcus Semien","R","2B"],["Corey Seager","L","SS"],["Josh Jung","R","3B"],["Wyatt Langford","R","OF"],["Adolis García","R","OF"],["Evan Carter","L","OF"],["Joc Pederson","L","DH"],["Nathan Eovaldi","R","P"],["Jacob deGrom","R","P"],["Shawn Armstrong","R","P"]],
+  "Seattle Mariners": [["Cal Raleigh","S","C"],["Josh Naylor","L","1B"],["Jorge Polanco","S","2B"],["J.P. Crawford","L","SS"],["Eugenio Suárez","R","3B"],["Randy Arozarena","R","OF"],["Julio Rodríguez","R","OF"],["Dominic Canzone","L","OF"],["Luke Raley","L","DH"],["Luis Castillo","R","P"],["Bryce Miller","R","P"],["Andrés Muñoz","R","P"]],
+  "LA Angels": [["Logan O'Hoppe","R","C"],["Nolan Schanuel","L","1B"],["Christian Moore","R","2B"],["Zach Neto","R","SS"],["Yoán Moncada","S","3B"],["Mike Trout","R","OF"],["Jo Adell","R","OF"],["Gustavo Campero","L","OF"],["Jorge Soler","R","DH"],["Yusei Kikuchi","L","P"],["José Soriano","R","P"],["Kenley Jansen","R","P"]],
+  "Oakland Athletics": [["Shea Langeliers","R","C"],["Tyler Soderstrom","L","1B"],["Zack Gelof","R","2B"],["Jacob Wilson","R","SS"],["Brett Harris","R","3B"],["Brent Rooker","R","DH"],["Lawrence Butler","L","OF"],["Colby Thomas","R","OF"],["Denzel Clarke","R","OF"],["Luis Severino","R","P"],["Jeffrey Springs","L","P"],["José Leclerc","R","P"]],
+  "Atlanta Braves": [["Sean Murphy","R","C"],["Matt Olson","L","1B"],["Ozzie Albies","S","2B"],["Nick Allen","R","SS"],["Austin Riley","R","3B"],["Ronald Acuña Jr.","R","OF"],["Michael Harris II","R","OF"],["Jurickson Profar","S","OF"],["Drake Baldwin","L","DH"],["Spencer Strider","R","P"],["Chris Sale","L","P"],["Raisel Iglesias","R","P"]],
+  "Miami Marlins": [["Agustín Ramírez","R","C"],["Eric Wagaman","R","1B"],["Xavier Edwards","L","2B"],["Otto López","R","SS"],["Connor Norby","R","3B"],["Kyle Stowers","L","OF"],["Dane Myers","R","OF"],["Griffin Conine","L","OF"],["Graham Pauley","R","DH"],["Cal Quantrill","R","P"],["Sandy Alcántara","R","P"],["Anthony Bender","R","P"]],
+  "NY Mets": [["Francisco Alvarez","R","C"],["Pete Alonso","R","1B"],["Marcus Semien","R","2B"],["Francisco Lindor","S","SS"],["Mark Vientos","R","3B"],["Juan Soto","L","OF"],["Cedric Mullins","L","OF"],["Jeff McNeil","L","OF"],["Brett Baty","L","DH"],["Kodai Senga","R","P"],["David Peterson","L","P"],["Edwin Díaz","R","P"]],
+  "Philadelphia Phillies": [["J.T. Realmuto","R","C"],["Bryce Harper","L","1B"],["Bryson Stott","L","2B"],["Trea Turner","R","SS"],["Alec Bohm","R","3B"],["Kyle Schwarber","L","DH"],["Nick Castellanos","R","OF"],["Brandon Marsh","L","OF"],["Harrison Bader","R","OF"],["Zack Wheeler","R","P"],["Jesús Luzardo","L","P"],["Jhoan Duran","R","P"]],
+  "Washington Nationals": [["Keibert Ruiz","S","C"],["Nathaniel Lowe","L","1B"],["Luis García Jr.","R","2B"],["CJ Abrams","L","SS"],["Brady House","R","3B"],["James Wood","L","OF"],["Dylan Crews","R","OF"],["Jacob Young","R","OF"],["Josh Bell","S","DH"],["MacKenzie Gore","L","P"],["Mitchell Parker","L","P"],["Kyle Finnegan","R","P"]],
+  "Milwaukee Brewers": [["William Contreras","R","C"],["Jake Bauers","L","1B"],["Brice Turang","L","2B"],["Joey Ortiz","R","SS"],["Caleb Durbin","R","3B"],["Christian Yelich","L","OF"],["Jackson Chourio","R","OF"],["Sal Frelick","L","OF"],["Isaac Collins","L","DH"],["Brandon Woodruff","R","P"],["Freddy Peralta","R","P"],["Trevor Megill","R","P"]],
+  "Chicago Cubs": [["Carson Kelly","R","C"],["Michael Busch","L","1B"],["Nico Hoerner","R","2B"],["Dansby Swanson","R","SS"],["Matt Shaw","R","3B"],["Kyle Tucker","R","OF"],["Ian Happ","S","OF"],["Pete Crow-Armstrong","L","OF"],["Seiya Suzuki","L","DH"],["Justin Steele","L","P"],["Shota Imanaga","L","P"],["Daniel Palencia","R","P"]],
+  "Cincinnati Reds": [["Tyler Stephenson","R","C"],["Spencer Steer","R","1B"],["Matt McLain","L","2B"],["Elly De La Cruz","S","SS"],["Ke'Bryan Hayes","R","3B"],["Austin Hays","R","OF"],["TJ Friedl","L","OF"],["Will Benson","L","OF"],["Noelvi Marte","R","DH"],["Hunter Greene","R","P"],["Andrew Abbott","L","P"],["Emilio Pagan","R","P"]],
+  "St. Louis Cardinals": [["Pedro Pagés","R","C"],["Willson Contreras","R","1B"],["Brendan Donovan","L","2B"],["Masyn Winn","R","SS"],["Nolan Arenado","R","3B"],["Iván Herrera","R","DH"],["Lars Nootbaar","L","OF"],["Victor Scott II","L","OF"],["Jordan Walker","R","OF"],["Sonny Gray","R","P"],["Miles Mikolas","R","P"],["JoJo Romero","L","P"]],
+  "Pittsburgh Pirates": [["Henry Davis","R","C"],["Spencer Horwitz","L","1B"],["Nick Gonzales","R","2B"],["Isiah Kiner-Falefa","S","SS"],["Jared Triolo","R","3B"],["Bryan Reynolds","S","OF"],["Oneil Cruz","R","OF"],["Jack Suwinski","L","OF"],["Andrew McCutchen","R","DH"],["Paul Skenes","R","P"],["Mitch Keller","R","P"],["Dennis Santana","R","P"]],
+  "LA Dodgers": [["Will Smith","R","C"],["Freddie Freeman","L","1B"],["Hyeseong Kim","L","2B"],["Miguel Rojas","R","SS"],["Max Muncy","L","3B"],["Shohei Ohtani","R","DH"],["Teoscar Hernández","R","OF"],["Mookie Betts","R","OF"],["Andy Pages","R","OF"],["Yoshinobu Yamamoto","R","P"],["Blake Snell","L","P"],["Tyler Glasnow","R","P"]],
+  "Arizona D-Backs": [["Gabriel Moreno","R","C"],["Pavin Smith","L","1B"],["Ketel Marte","S","2B"],["Geraldo Perdomo","S","SS"],["Blaze Alexander","R","3B"],["Corbin Carroll","L","OF"],["Lourdes Gurriel Jr.","R","OF"],["Alek Thomas","L","OF"],["Adrian Del Castillo","R","DH"],["Brandon Pfaadt","R","P"],["Eduardo Rodriguez","L","P"],["Kevin Ginkel","R","P"]],
+  "SF Giants": [["Patrick Bailey","S","C"],["Rafael Devers","L","1B"],["Tyler Fitzgerald","R","2B"],["Willy Adames","R","SS"],["Matt Chapman","R","3B"],["Jung Hoo Lee","L","OF"],["Heliot Ramos","R","OF"],["Luis Matos","R","OF"],["Bryce Eldridge","L","DH"],["Logan Webb","R","P"],["Robbie Ray","L","P"],["Ryan Walker","R","P"]],
+  "San Diego Padres": [["Freddy Fermín","R","C"],["Luis Arraez","L","1B"],["Jake Cronenworth","L","2B"],["Xander Bogaerts","R","SS"],["Manny Machado","R","3B"],["Fernando Tatis Jr.","R","OF"],["Jackson Merrill","L","OF"],["Ramón Laureano","R","OF"],["Elías Díaz","R","DH"],["Nick Pivetta","R","P"],["Michael King","R","P"],["Jason Adam","R","P"]],
+  "Colorado Rockies": [["Hunter Goodman","R","C"],["Michael Toglia","L","1B"],["Thairo Estrada","R","2B"],["Ezequiel Tovar","R","SS"],["Tyler Freeman","R","3B"],["Brenton Doyle","R","OF"],["Mickey Moniak","L","OF"],["Jordan Beck","L","OF"],["Sam Hilliard","L","DH"],["German Marquez","R","P"],["Kyle Freeland","L","P"],["Jimmy Herget","R","P"]]
+};
+
 function rollPlayer() {
   const roll3d6 = () => rint(1, 6) + rint(1, 6) + rint(1, 6);
   const h = rollD(20);
@@ -144,16 +180,45 @@ function salaryOf(p) {
   if (t >= 35) return 4; if (t >= 23) return 2; if (t >= 16) return 1;
   return 0.5;
 }
-function rollRoster() { const r = []; for (let i = 0; i < 12; i++) r.push(rollPlayer()); return r; }
+function rollRoster(teamName) {
+  const r = [];
+  const real = TEAM_ROSTERS[teamName];
+  if (real) { // real MLB club: real names, real hands; skills still come from the dice
+    real.forEach(e => {
+      const p = rollPlayer();
+      p.name = e[0];
+      p.hand = e[1];
+      p.realPos = e[2];
+      r.push(p);
+    });
+    return r;
+  }
+  for (let i = 0; i < 12; i++) r.push(rollPlayer());
+  return r;
+}
 
-/* NPTs / quick teams: cut the 3 weakest, auto-assign positions, batting order by Batting */
+/* NPTs / quick teams: line up real positions where they exist, skill decides the rest; pitcher bats last */
 function autoAssign(roster) {
-  const pool = roster.slice().sort((a, b) => totalSkill(b) - totalSkill(a)).slice(0, 9);
-  const byP = pool.slice().sort((a, b) => b.P - a.P);
-  const pitcher = byP[0];
-  const rest = pool.filter(p => p !== pitcher).sort((a, b) => b.F - a.F);
-  const positions = { P: pitcher, C: rest[0], SS: rest[1], "3B": rest[2], "2B": rest[3], "1B": rest[4], LF: rest[5], CF: rest[6], RF: rest[7] };
-  const lineup = pool.slice().sort((a, b) => b.B - a.B);
+  const taken = new Set();
+  const choose = (want, skillKey) => {
+    const cands = roster.filter(p => !taken.has(p));
+    const got = cands.find(p => p.realPos === want) ||
+      cands.slice().sort((a, b) => b[skillKey] - a[skillKey])[0];
+    taken.add(got);
+    return got;
+  };
+  const pitcher = choose("P", "P");
+  const C = choose("C", "F");
+  const SS = choose("SS", "F");
+  const three = choose("3B", "F");
+  const two = choose("2B", "F");
+  const first = choose("1B", "F");
+  const of1 = choose("OF", "F");
+  const of2 = choose("OF", "F");
+  const of3 = choose("OF", "F");
+  const positions = { P: pitcher, C, SS, "3B": three, "2B": two, "1B": first, LF: of1, CF: of2, RF: of3 };
+  const starters = [C, two, SS, three, first, of1, of2, of3].sort((a, b) => b.B - a.B);
+  const lineup = starters.concat([pitcher]); // no DH: the pitcher bats last
   return { positions, lineup, roster };
 }
 
@@ -1124,7 +1189,7 @@ function makeNPTs(except) {
   const npts = {};
   Object.keys(TEAM_MARKET).forEach(t => {
     if (t === except) return;
-    const aa = autoAssign(rollRoster());
+    const aa = autoAssign(rollRoster(t));
     npts[t] = aa;
   });
   return npts;
@@ -1561,7 +1626,7 @@ function render() {
 /* ================= season flow ================= */
 
 function startSeasonSetup(teamName) {
-  const roster = rollRoster();
+  const roster = rollRoster(teamName);
   S.season = {
     id: String(Date.now()) + String(Math.floor(Math.random() * 1000)),
     team: teamName, year: 1, money: 40,
@@ -2057,8 +2122,8 @@ function chooseTeam(opt) {
       return;
     }
     if (opt === S.quickSel.picked) return; // can't play a team against itself
-    const v = autoAssign(rollRoster());
-    const h = autoAssign(rollRoster());
+    const v = autoAssign(rollRoster(S.quickSel.picked));
+    const h = autoAssign(rollRoster(opt));
     S.visitor = buildGameTeam(S.quickSel.picked, v.lineup, v.positions);
     S.home = buildGameTeam(opt, h.lineup, h.positions);
     S.userSide = null;
@@ -2066,8 +2131,8 @@ function chooseTeam(opt) {
     S.screen = "pickSide";
     return;
   }
-  const v = autoAssign(rollRoster());
-  const h = autoAssign(rollRoster());
+  const v = autoAssign(rollRoster(opt));
+  const h = autoAssign(rollRoster(pick(Object.keys(TEAM_MARKET).filter(x => x !== opt))));
   S.visitor = buildGameTeam(opt, v.lineup, v.positions);
   S.home = buildGameTeam(pick(Object.keys(TEAM_MARKET).filter(x => x !== opt)), h.lineup, h.positions);
   S.userSide = null;
