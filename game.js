@@ -367,9 +367,11 @@ function updateField() {
     const el = document.getElementById(id);
     if (!el) continue;
     if (S.retiring.includes(id) || S.walkingOut.includes(id)) continue;
+    if (el._anim) continue; // a run/walk animation owns this figure right now
     const slot = S.rotation.indexOf(id);
+    el.style.transition = "none";
     if (slot === -1) {
-      el.classList.remove("atbat", "running");
+      el.classList.remove("atbat");
       el.dataset.base = "bench";
       el.style.opacity = "1";
       setXY(el, benchPos(i));
@@ -378,13 +380,8 @@ function updateField() {
     el.classList.toggle("atbat", slot === 0);
     el.style.opacity = "1";
     if (slot === 0) { setXY(el, P.home); el.dataset.base = "-1"; continue; }
-    const bi = slot - 1;
-    if (el.dataset.base !== String(bi)) {
-      el.classList.add("running");
-      setTimeout(() => el.classList.remove("running"), 760);
-    }
-    el.dataset.base = String(bi);
-    setXY(el, basePt(bi));
+    el.dataset.base = String(slot - 1);
+    setXY(el, basePt(slot - 1));
   }
   const b = document.getElementById("ball");
   if (b) b.style.opacity = "0";
@@ -594,10 +591,19 @@ async function resolveCount() {
     if (S.balls >= 4) { // Stater walk: batter to 1st, only forced runners advance
       showBanner("WALK", "walk"); log("WALK");
       // deepest first: 3rd scores only if 1st & 2nd were occupied (force chain)
-      if (S.rotation[1] && S.rotation[2] && S.rotation[3]) moveSlot(3, 0);
-      if (S.rotation[1] && S.rotation[2]) moveSlot(2, 3);
-      if (S.rotation[1]) moveSlot(1, 2);
-      moveSlot(0, 1);
+      const movers = [];
+      if (S.rotation[1] && S.rotation[2] && S.rotation[3]) movers.push([3, 0]);
+      if (S.rotation[1] && S.rotation[2]) movers.push([2, 3]);
+      if (S.rotation[1]) movers.push([1, 2]);
+      movers.push([0, 1]);
+      // everyone forced forward jogs one base, around the diamond — no shortcuts
+      await Promise.all(movers.map(([from, to]) => {
+        const fig = S.rotation[from];
+        const el = fig && document.getElementById(fig);
+        if (!el) return Promise.resolve();
+        return runRunner(el, runLegs(from === 0 ? 3 : from - 1, to === 0 ? 3 : to - 1), 450);
+      }));
+      movers.forEach(([from, to]) => moveSlot(from, to));
       endPA("walk");
       continue;
     }
@@ -713,15 +719,17 @@ async function resolvePitch(type) {
     return;
   }
 
-  // batted ball: direction + fielding (a declared steal is off with the bat)
+  // batted ball: direction + fielding. A declared steal is off with the bat —
+  // that runner runs on the hit, and put-out attempts against him are at −2.
+  const stealRunner = S.stealTry !== null ? S.baseRunners[S.stealTry + 1] : null;
   S.stealTry = null;
   const dirRoll = await rollDie(6, "HIT ANGLE (d6)", battingTeam() === userTeam());
   const lhb = bat.hand === "L" || (bat.hand === "S" && S.pitcher.hand === "R");
   const gbPos = (lhb ? GB_LOC_LH : GB_LOC_RH)[dirRoll - 1];
   const ofPos = (lhb ? OF_LOC_LH : OF_LOC_RH)[dirRoll - 1];
   if (result === "Ground Ball") await resolveGroundBall(bat, gbPos);
-  else if (result === "Fly Ball") await resolveFlyBall(bat, ofPos);
-  else await resolveLineDrive(bat, ofPos);
+  else if (result === "Fly Ball") await resolveFlyBall(bat, ofPos, stealRunner);
+  else await resolveLineDrive(bat, ofPos, stealRunner);
 
   if (S.extraBase) { render(); return; } // waiting on the user's extra-base call
   await resolveCount();
@@ -756,9 +764,7 @@ async function resolveGroundBall(bat, pos) {
     showBanner("OUT!", "out");
     log("GROUND OUT: " + pos + " throws out " + bat.name);
     S.outs++;
-    // forced runners still advance one base
-    if (S.rotation[1]) moveSlot(1, 2);
-    endPA("out"); // retire the batter, advance the lineup, clear the count
+    endPA("out"); // only the batter is out on a grounder — runners hold their bases
     return;
   }
   // safe: batter reaches first, runners advance one base
@@ -769,7 +775,7 @@ async function resolveGroundBall(bat, pos) {
   endPA("hit");
 }
 
-async function resolveFlyBall(bat, pos) {
+async function resolveFlyBall(bat, pos, stealRunner) {
   const fielder = S.fielders[pos];
   const fm = skillMod(fielder.F);
   const fRoll = await rollDie(20, "FLY BALL \u2014 " + lastName(fielder.name) + " (" + pos + ") (d20)", fieldingTeam() === userTeam());
@@ -797,11 +803,11 @@ async function resolveFlyBall(bat, pos) {
   log("Fly ball drops \u2014 everyone advances one base");
   advanceSlots(1);
   await runRunners(1);
-  await offerExtraBase(pos, FB_THROW[pos], bat, 0);
+  await offerExtraBase(pos, FB_THROW[pos], bat, stealRunner);
   endPA("hit");
 }
 
-async function resolveLineDrive(bat, pos) {
+async function resolveLineDrive(bat, pos, stealRunner) {
   const fielder = S.fielders[pos];
   const fm = skillMod(fielder.F);
   const fRoll = await rollDie(20, "LINE DRIVE \u2014 " + lastName(fielder.name) + " (" + pos + ") (d20)", fieldingTeam() === userTeam());
@@ -829,31 +835,33 @@ async function resolveLineDrive(bat, pos) {
   log("Line drive \u2014 batter and runners advance two bases");
   advanceSlots(2);
   await runRunners(2);
-  await offerExtraBase(pos, LD_THROW[pos], bat, 1);
+  await offerExtraBase(pos, LD_THROW[pos], bat, stealRunner);
   endPA("hit");
 }
 
-/* one extra-base attempt for the lead runner; fielder gets one throw */
-async function offerExtraBase(pos, chart, bat, unforcedPenalty) {
+/* one extra-base attempt for the lead runner; fielder gets one throw.
+   Unforced runners are tagged out (−1); a runner who declared steal and runs
+   on the hit was leading off, so put-out attempts against him are −2. */
+async function offerExtraBase(pos, chart, bat, stealRunner) {
   const leadSlot = [3, 2, 1].find(s => S.baseRunners[s]);
   if (leadSlot === undefined) return;
   const runner = S.baseRunners[leadSlot];
   const isUserRunner = battingTeam() === userTeam();
   if (isUserRunner) {
-    S.extraBase = { slot: leadSlot, pos, chart, unforcedPenalty, runnerName: runner.name };
+    S.extraBase = { slot: leadSlot, pos, chart, stealRunner, runnerName: runner.name };
     S.phase = "extrabase";
     log(runner.name + " can try for an extra base \u2014 send him?");
     return;
   }
-  if (rint(1, 100) <= 60) await attemptExtraBase(leadSlot, pos, chart, unforcedPenalty);
+  if (rint(1, 100) <= 60) await attemptExtraBase(leadSlot, pos, chart, stealRunner);
 }
 
-async function attemptExtraBase(slot, pos, chart, unforcedPenalty) {
+async function attemptExtraBase(slot, pos, chart, stealRunner) {
   const runner = S.baseRunners[slot];
   const fig = S.rotation[slot];
   const fielder = S.fielders[pos];
   const dest = slot + 1; // slot 1..3 = 1st..3rd base; the runner tries for the next base (4 = home)
-  const target = (chart[dest - 1] || 12) + unforcedPenalty;
+  const target = (chart[dest - 1] || 12) + (runner === stealRunner ? 2 : 1);
   const tRoll = await rollDie(20, "THE THROW \u2014 " + lastName(fielder.name) + " (" + pos + ") (d20)", fieldingTeam() === userTeam());
   const roll = tRoll + skillMod(fielder.F) - skillMod(runner.R);
   log(runner.name + " tries for an extra base \u2014 " + fielder.name + " throws (" + roll + " vs " + target + ")");
@@ -932,6 +940,7 @@ function runLegs(cur, tgt) {
 }
 function glide(el, from, to, dur) {
   return new Promise(async res => {
+    el._anim = true; // updateField must not snap this figure mid-run
     el.style.transition = "none";
     setXY(el, from);
     await nextFrame();
@@ -939,6 +948,7 @@ function glide(el, from, to, dur) {
     setXY(el, to);
     await wait(dur);
     el.style.transition = "";
+    el._anim = false;
     res();
   });
 }
@@ -1028,44 +1038,74 @@ function sendBatterOut() {
 /* ================= half-inning ceremony ================= */
 
 async function halfInningSwitch() {
-  const exit = fieldingTeam() === S.home ? P.dugoutH : P.dugoutV;
+  const oldFldDug = defDugoutPos(); // the fielding team's own dugout (they exit here)
+  const oldBatDug = dugoutPos();    // the batting team's own dugout (the new defense emerges here)
   const defKeys = Object.keys(P.def);
+  const legDur = 900;
+
+  // 1. the defense walks into its own dugout and disappears
   await Promise.all(defKeys.map((k, idx) => {
     const el = document.getElementById("def" + k);
     if (!el) return Promise.resolve();
     return wait(idx * 60).then(() => {
       el.classList.add("running");
-      const spot = [exit[0] + (idx % 3) * 16 - 16, exit[1] + Math.floor(idx / 3) * 9 - 4];
-      return glide(el, P.def[k], spot, 900).then(() => {
+      const spot = [oldFldDug[0] + (idx % 3) * 16 - 16, oldFldDug[1] + Math.floor(idx / 3) * 9 - 4];
+      return glide(el, P.def[k], spot, legDur).then(() => {
         el.classList.remove("running");
         el.style.opacity = "0";
       });
     });
   }));
 
-  await Promise.all(defKeys.map((k, idx) => {
-    const el = document.getElementById("off" + idx);
-    if (!el) return Promise.resolve();
-    const id = "off" + idx;
-    const slot = S.rotation.indexOf(id);
-    const from = slot === 0 ? P.home : slot > 0 ? basePt(slot - 1) : benchPos(idx);
-    return wait(idx * 60).then(() => {
-      el.classList.add("running");
-      return glide(el, from, P.def[k], 900).then(() => el.classList.remove("running"));
-    });
-  }));
+  // 2. the batters head back into their own dugout (snap there, vanish)
+  for (let i = 0; i < 9; i++) {
+    const el = document.getElementById("off" + i);
+    if (!el) continue;
+    el.style.transition = "none";
+    setXY(el, benchPos(i));
+    el.style.opacity = "0";
+    el.dataset.base = "bench";
+  }
 
-  S._colKey = null;
+  // 3. flip the half, recolor both squads, clear the bases and the count
+  if (S.isBottom) { S.inning++; S.isBottom = false; }
+  else { S.isBottom = true; }
+  S.bases = [0, 0, 0]; // Stater extra innings: full innings, no ghost runner
+  S.outs = 0; S.balls = 0; S.strikes = 0;
   S.rotation = [null, null, null, null];
   S.baseRunners = [null, null, null, null];
   S.retiring = []; S.walkingOut = [];
+  S._colKey = String(S.isBottom);
+  const offC = teamColors(battingTeam()), defC = teamColors(fieldingTeam());
   for (let i = 0; i < 9; i++) {
     const el = document.getElementById("off" + i);
-    if (el) { el.style.transition = "none"; el.style.opacity = "0"; el.dataset.base = ""; }
+    if (el) { el.style.setProperty("--p", offC[0]); el.style.setProperty("--s", offC[1]); }
     const d = document.getElementById("def" + defKeys[i]);
-    if (d) { d.style.transition = "none"; setXY(d, P.def[defKeys[i]]); d.style.opacity = "1"; }
+    if (d) { d.style.setProperty("--p", defC[0]); d.style.setProperty("--s", defC[1]); }
   }
-  updateField();
+
+  // 4. the new batters take their seats in their own dugout
+  for (let i = 0; i < 9; i++) {
+    const el = document.getElementById("off" + i);
+    if (!el) continue;
+    el.style.transition = "none";
+    setXY(el, benchPos(i));
+    el.style.opacity = "1";
+  }
+
+  // 5. the new defense walks OUT of its own dugout to the field
+  await Promise.all(defKeys.map((k, idx) => {
+    const d = document.getElementById("def" + defKeys[idx]);
+    if (!d) return Promise.resolve();
+    const start = [oldBatDug[0] + (idx % 3) * 16 - 16, oldBatDug[1] + Math.floor(idx / 3) * 9 - 4];
+    d.style.transition = "none";
+    setXY(d, start);
+    d.style.opacity = "1";
+    return wait(idx * 60).then(() => {
+      d.classList.add("running");
+      return glide(d, start, P.def[k], legDur).then(() => d.classList.remove("running"));
+    });
+  }));
 }
 
 async function onContinue() {
@@ -1901,7 +1941,7 @@ async function onExtraBase(send) {
   S.extraBase = null;
   S.animating = true;
   render();
-  if (send) await attemptExtraBase(eb.slot, eb.pos, eb.chart, eb.unforcedPenalty);
+  if (send) await attemptExtraBase(eb.slot, eb.pos, eb.chart, eb.stealRunner);
   await resolveCount();
   S.phase = "windup";
   S.animating = false;
@@ -1910,7 +1950,7 @@ async function onExtraBase(send) {
 
 /* ================= roll / flow ================= */
 
-function onContinue() {
+async function onContinue() {
   if (S.walkOff) { finishGame(); return; }
   if (S.isBottom && S.inning >= 9 && S.score.Visitor !== S.score.Home) { finishGame(); return; }
   if (!S.isBottom && S.inning >= 9 && S.score.Home > S.score.Visitor) { finishGame(); return; }
@@ -1918,15 +1958,10 @@ function onContinue() {
   S.awaitNext = null;
   S.animating = true;
   render();
-  halfInningSwitch().then(() => {
-    if (S.isBottom) { S.inning++; S.isBottom = false; }
-    else { S.isBottom = true; }
-    S.bases = [0, 0, 0]; // Stater extra innings: full innings, no ghost runner
-    S.outs = 0; S.balls = 0; S.strikes = 0;
-    setupHalf();
-    S.animating = false;
-    render();
-  });
+  await halfInningSwitch(); // flips the half, recolors, and walks both squads from their own dugouts
+  setupHalf();
+  S.animating = false;
+  render();
 }
 
 function finishGame() {
