@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "19";
+const GAME_VERSION = "20";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -403,19 +403,6 @@ function updateField() {
       if (el && defC) { el.style.setProperty("--p", defC[0]); el.style.setProperty("--s", defC[1]); }
     });
   }
-  if (S._colKey !== String(S.isBottom)) {
-    S._colKey = String(S.isBottom);
-    const defC = fieldingTeam() ? teamColors(fieldingTeam()) : null;
-    const offC = battingTeam() ? teamColors(battingTeam()) : null;
-    for (let i = 0; i < 9; i++) {
-      const el = document.getElementById("off" + i);
-      if (el && offC) { el.style.setProperty("--p", offC[0]); el.style.setProperty("--s", offC[1]); }
-    }
-    Object.keys(P.def).forEach(k => {
-      const el = document.getElementById("def" + k);
-      if (el && defC) { el.style.setProperty("--p", defC[0]); el.style.setProperty("--s", defC[1]); }
-    });
-  }
   for (let i = 0; i < 9; i++) {
     const id = "off" + i;
     const el = document.getElementById(id);
@@ -423,19 +410,14 @@ function updateField() {
     if (S.retiring.includes(id) || S.walkingOut.includes(id)) continue;
     if (el._anim) continue; // a run/walk animation owns this figure right now
     const slot = S.rotation.indexOf(id);
-    el.style.transition = "none";
-    if (slot === -1) {
-      el.classList.remove("atbat");
-      el.dataset.base = "bench";
-      el.style.opacity = "1";
-      setXY(el, benchPos(i), 1.0); // seated in the dugout, tucked in tight
-      continue;
-    }
     el.classList.toggle("atbat", slot === 0);
-    el.style.opacity = "1";
-    if (slot === 0) { setXY(el, batBoxPt()); el.dataset.base = "-1"; continue; }
-    el.dataset.base = String(slot - 1);
-    setXY(el, basePt(slot - 1));
+    // on-base figures are positioned exclusively by their run animations — updateField never teleports them
+    if (slot === -1) {
+      el.dataset.base = "bench";
+      el.style.transition = "none";
+      el.style.opacity = "1";
+      setXY(el, benchPos(i), 1.0); // idle bench figure back in his seat
+    }
   }
   const b = document.getElementById("ball");
   if (b) b.style.opacity = "0";
