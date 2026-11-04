@@ -1097,6 +1097,8 @@ async function walkToDugout(elId, fromPt) {
   await glide(el, fromPt, benchPos(parseInt(elId.slice(3), 10)), 800);
   el.dataset.base = "bench";
   S.retiring = S.retiring.filter(x => x !== elId);
+  // the plate traffic just cleared — this render releases the next batter from the dugout
+  if (S && S.screen === "game" && !S.animating && !S.awaitNext) render();
 }
 
 function sendBatterOut() {
@@ -1691,7 +1693,7 @@ function renderFieldUI() {
       dieHtml(pr.done ? pr.value : null) + '</div>' +
       (pr.done ? "" : '<button class="btn rollbtn" data-action="roll-die" style="flex:0 0 auto">ROLL</button>');
   } else if (S.phase === "windup" && !S.batterReady) {
-    rollHtml = '<div class="dielabel" style="padding:8px">THE BATTER IS DIGGING IN\u2026</div>';
+    rollHtml = '<div class="dielabel" style="padding:8px">NEW BATTER STEPPING UP TO THE PLATE\u2026</div>';
   } else if (S.phase === "windup") {
     if (up) {
       rollHtml = PITCH_TYPES.map(t => '<button class="btn rollbtn" data-action="pitch" data-type="' + t + '" ' + (S.animating ? "disabled" : "") + '>' + t.toUpperCase() + '</button>').join("");
