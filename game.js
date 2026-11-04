@@ -590,17 +590,20 @@ function moveSlot(from, to) { // rotate figure + runner from slot to slot (to ma
   }
 }
 
-async function advanceSlots(fb) { // every occupant advances fb slots; crossers score
+async function advanceSlots(fb) { // everyone advances fb bases around the diamond — nobody runs past home
   const rot = S.rotation.slice(), run = S.baseRunners.slice();
   if (rot[0]) run[0] = batter(); // the batter at the plate becomes a runner
   S.rotation = [null, null, null, null]; S.baseRunners = [null, null, null, null];
   for (let i = 0; i < 4; i++) {
     if (!rot[i] && !run[i]) continue;
-    const t = (i + fb) % 4;
-    if (t === 0) {
+    const land = i + fb;
+    // an advance that reaches home plate scores — runners never wrap back around
+    if (land >= 4) {
       if (run[i]) { S.score[sideKey()]++; log("RUN SCORES: " + run[i].name); }
       if (rot[i]) S.retiring.push(rot[i]); // he'll run home first, then walk to his seat (see runRunners)
-    } else { S.rotation[t] = rot[i]; S.baseRunners[t] = run[i]; }
+    } else {
+      S.rotation[land] = rot[i]; S.baseRunners[land] = run[i];
+    }
   }
 }
 
@@ -1058,8 +1061,8 @@ async function runRunners(fb) {
     if (!oldRot[i]) continue;
     const el = document.getElementById(oldRot[i]);
     if (!el) continue;
-    const tgtOrder = (i + fb) % 4;
-    const scored = tgtOrder === 0;
+    const tgtOrder = i + fb;
+    const scored = tgtOrder >= 4; // an advance that reaches home is a run — nobody wraps past it
     const tgt = scored ? -1 : tgtOrder - 1;
     jobs.push(runRunner(el, runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt), legDur).then(() => {
       if (scored) walkToDugout(oldRot[i], P.home); // finished his run home — now to his own seat
