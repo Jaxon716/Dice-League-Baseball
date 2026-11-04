@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "27";
+const GAME_VERSION = "28";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -347,9 +347,9 @@ function hideBall() {
 
 function swingBatter(type) {
   const el = document.querySelector(".atbat");
-  if (!el) { await0(250); return; }
+  if (!el) { return await0(250); }
   const body = el.querySelector(".body");
-  if (!body) { await0(250); return; }
+  if (!body) { return await0(250); }
   const cls = type === "miss" ? "swingmiss" : type === "tip" ? "swingtip" : "swing";
   body.classList.remove("swing", "swingmiss", "swingtip");
   if (cls === "swing") { // bat meets ball — flash the impact rings at the plate
@@ -436,7 +436,11 @@ function updateField() {
   // self-heal: any retired figure whose walk home got interrupted snaps to his own seat
   S.retiring.slice().forEach(id => {
     const el = document.getElementById(id);
-    if (el && !el._anim) {
+    if (!el) { // his figure is gone — he can't walk home; drop him and move on
+      S.retiring = S.retiring.filter(x => x !== id);
+      return;
+    }
+    if (!el._anim) {
       const i = parseInt(id.slice(3), 10);
       el.style.transition = "none";
       setXY(el, benchPos(i));
@@ -620,6 +624,18 @@ function startGame() {
   S.log = ["--- Play Ball! ---"];
   S.screen = "game";
   setupHalf();
+  // snap the defense back to their stations (a rematch must not reuse last game's spots)
+  Object.keys(P.def).forEach(k => {
+    const el = document.getElementById("def" + k);
+    if (!el) return;
+    el.style.transition = "none";
+    el._t = null;
+    setXY(el, P.def[k]);
+    el.classList.remove("running");
+    el.style.opacity = "1";
+  });
+  const ball = document.getElementById("ball");
+  if (ball) ball.style.opacity = "0";
   if (S.visitor && S.visitor.fatigueReset) [S.visitor, S.home].forEach(t => t.roster && t.roster.forEach(p => p.fatigue = 0));
   render();
 }
@@ -1181,7 +1197,10 @@ function batBoxPt() { // batters stand in the batter's box beside the plate, not
 
 async function walkToDugout(elId, fromPt) {
   const el = document.getElementById(elId);
-  if (!el) return;
+  if (!el) { // figure gone — clear him out or the plate traffic jams forever
+    if (S) S.retiring = S.retiring.filter(x => x !== elId);
+    return;
+  }
   el.classList.add("running");
   await glide(el, fromPt, benchPos(parseInt(elId.slice(3), 10)), 800);
   el.dataset.base = "bench";
@@ -2318,7 +2337,7 @@ document.getElementById("app").addEventListener("click", e => {
   }
   else if (a === "draft-pick") {
     const s = S.season;
-    const p = s.off.draft.splice(parseInt(el.dataset.idx, 1), 1)[0] || s.off.draft.splice(parseInt(el.dataset.idx, 10), 1)[0];
+    const p = s.off.draft.splice(parseInt(el.dataset.idx, 10), 1)[0];
     if (p) {
       s.roster.push(p);
       s.off.draftDone = true;
