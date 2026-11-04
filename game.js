@@ -544,9 +544,9 @@ function moveSlot(from, to) { // rotate figure + runner from slot to slot (to ma
   let run = S.baseRunners[from];
   if (from === 0 && !run) run = batter(); // the batter becomes a baserunner on the bases
   S.rotation[from] = null; S.baseRunners[from] = null;
-  if (to === 0) { // crossed the plate
+  if (to === 0) { // crossed the plate — the caller runs him home, THEN he walks to his seat
     if (run) { S.score[sideKey()]++; log("RUN SCORES: " + run.name); }
-    if (fig) { S.retiring.push(fig); walkToDugout(fig, P.home); }
+    if (fig) S.retiring.push(fig);
   } else {
     S.rotation[to] = fig; S.baseRunners[to] = run;
   }
@@ -561,7 +561,7 @@ async function advanceSlots(fb) { // every occupant advances fb slots; crossers 
     const t = (i + fb) % 4;
     if (t === 0) {
       if (run[i]) { S.score[sideKey()]++; log("RUN SCORES: " + run[i].name); }
-      if (rot[i]) { S.retiring.push(rot[i]); walkToDugout(rot[i], P.home); }
+      if (rot[i]) S.retiring.push(rot[i]); // he'll run home first, then walk to his seat (see runRunners)
     } else { S.rotation[t] = rot[i]; S.baseRunners[t] = run[i]; }
   }
 }
@@ -603,7 +603,9 @@ async function resolveCount() {
         if (!el) return Promise.resolve();
         return runRunner(el, runLegs(from === 0 ? 3 : from - 1, to === 0 ? 3 : to - 1), 450);
       }));
+      const scoredFig = movers.some(([, to]) => to === 0) ? S.rotation[3] : null;
       movers.forEach(([from, to]) => moveSlot(from, to));
+      if (scoredFig) walkToDugout(scoredFig, P.home);
       endPA("walk");
       continue;
     }
@@ -878,7 +880,14 @@ async function attemptExtraBase(slot, pos, chart, stealRunner) {
     log("SAFE! " + runner.name + " takes the extra base");
     showBanner("SAFE!", "safe");
     moveSlot(slot, dest === 4 ? 0 : dest);
-    if (dest <= 3) await runRunnerLeg(dest);
+    if (dest <= 3) {
+      await runRunnerLeg(dest);
+    } else if (fig) {
+      // he was standing on 3rd — run him the last 90 feet, then to his own seat
+      const el = document.getElementById(fig);
+      if (el) await runRunner(el, runLegs(2, 3), 450);
+      walkToDugout(fig, P.home);
+    }
   }
 }
 
@@ -972,28 +981,11 @@ async function runRunners(fb) {
     const scored = tgtOrder === 0;
     const tgt = scored ? -1 : tgtOrder - 1;
     jobs.push(runRunner(el, runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt), legDur).then(() => {
-      if (scored && oldRun[i]) walkToDugout(oldRot[i], P.home);
+      if (scored) walkToDugout(oldRot[i], P.home); // finished his run home — now to his own seat
     }));
   }
   await Promise.all(jobs);
-
-  for (let i = 0; i < 9; i++) {
-    const id = "off" + i;
-    const el = document.getElementById(id);
-    if (!el) continue;
-    if (S.retiring.includes(id) || S.walkingOut.includes(id)) continue;
-    el.style.transition = "none";
-    el.style.opacity = "0";
-  }
   updateField();
-  for (let i = 0; i < 9; i++) {
-    const id = "off" + i;
-    const el = document.getElementById(id);
-    if (!el) continue;
-    if (S.retiring.includes(id) || S.walkingOut.includes(id)) continue;
-    el.style.transition = "";
-    el.style.opacity = "1";
-  }
 }
 
 /* ================= dugout pool ================= */
@@ -1013,26 +1005,30 @@ async function walkToDugout(elId, fromPt) {
 
 function sendBatterOut() {
   if (S.rotation[0]) return;
-  for (let i = 0; i < 9; i++) {
-    const id = "off" + i;
-    if (S.rotation.includes(id) || S.retiring.includes(id) || S.walkingOut.includes(id)) continue;
-    const el = document.getElementById(id);
-    if (!el) continue;
-    S.rotation[0] = id;
-    S.baseRunners[0] = null;
-    S.walkingOut.push(id);
-    el.style.transition = "none";
-    setXY(el, benchPos(i));
-    el.classList.add("running");
-    el.style.opacity = "1";
-    glide(el, benchPos(i), P.home, 700).then(() => {
-      el.dataset.base = "-1";
-      S.walkingOut = S.walkingOut.filter(x => x !== id);
-      el.style.transition = "";
-      el.classList.remove("running");
-    });
-    return;
+  let id = "off" + (S.batIdx % 9); // each lineup slot owns its own dugout seat
+  if (S.rotation.includes(id) || S.retiring.includes(id) || S.walkingOut.includes(id)) {
+    // his figure is stranded on the bases — send the first available teammate
+    for (let i = 0; i < 9; i++) {
+      const cid = "off" + i;
+      if (!S.rotation.includes(cid) && !S.retiring.includes(cid) && !S.walkingOut.includes(cid)) { id = cid; break; }
+    }
   }
+  const el = document.getElementById(id);
+  if (!el) return;
+  const seat = parseInt(id.slice(3), 10);
+  S.rotation[0] = id;
+  S.baseRunners[0] = null;
+  S.walkingOut.push(id);
+  el.style.transition = "none";
+  setXY(el, benchPos(seat));
+  el.classList.add("running");
+  el.style.opacity = "1";
+  glide(el, benchPos(seat), P.home, 700).then(() => {
+    el.dataset.base = "-1";
+    S.walkingOut = S.walkingOut.filter(x => x !== id);
+    el.style.transition = "";
+    el.classList.remove("running");
+  });
 }
 
 /* ================= half-inning ceremony ================= */
