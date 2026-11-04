@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "20";
+const GAME_VERSION = "21";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -593,8 +593,9 @@ function moveSlot(from, to) { // rotate figure + runner from slot to slot (to ma
 
 async function advanceSlots(fb, x) { // batter takes fb bases; runners take x if given (default fb) — nobody runs past home
   const rF = x === undefined ? fb : x;
-  const rot = S.rotation.slice(), run = S.baseRunners.slice();
-  if (!rot[0]) rot[0] = claimPlateFigure(); // the batter must exist before he can advance — never spawn a figureless runner
+  if (!S.rotation[0]) claimPlateFigure(); // the batter must exist before he can advance — never spawn a figureless runner
+  const pre = { rot: S.rotation.slice() }; // pre-advance figure slots, for the run animation
+  const rot = pre.rot, run = S.baseRunners.slice();
   if (rot[0]) run[0] = batter(); // the batter at the plate becomes a runner
   S.rotation = [null, null, null, null]; S.baseRunners = [null, null, null, null];
   for (let i = 0; i < 4; i++) {
@@ -608,6 +609,37 @@ async function advanceSlots(fb, x) { // batter takes fb bases; runners take x if
       S.rotation[land] = rot[i]; S.baseRunners[land] = run[i];
     }
   }
+  return pre;
+}
+
+async function runRunners(fb, x, pre) { // animates every figure from its PRE-advance base to its new one
+  const rF = x === undefined ? fb : x;
+  const d = 450;
+  const oR = (pre && pre.rot) || S.rotation.slice();
+  const jobs = [];
+  for (let i = 0; i < 4; i++) {
+    const fig = oR[i];
+    if (!fig) continue;
+    const el = document.getElementById(fig);
+    if (!el) continue;
+    const land = i + (i === 0 ? fb : rF);
+    const scored = land >= 4; // an advance that reaches home is a run — nobody wraps past it
+    const tgt = scored ? -1 : land - 1;
+    jobs.push(runRunner(el, runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt), d).then(() => {
+      if (scored) walkToDugout(fig, P.home); // finished his run home — now to his own seat
+    }));
+  }
+  await Promise.all(jobs);
+  updateField();
+}
+
+async function adv
+(fb, x
+) { // state
+ advance
+ + runs
+  const pre = await advanceSlots(fb, x);
+  await runRunners(fb, x, pre);
 }
 
 function endPA(kind) { // kind: 'out' | 'walk' | 'hit'
@@ -759,8 +791,7 @@ async function resolvePitch(type) {
     S.stealTry = null;
     await ballTo(P.home, crowdPt(), 750);
     log("HOME RUN! " + bat.name);
-    advanceSlots(4);
-    await runRunners(4);
+    await adv(4);
     endPA("hit");
     await resolveCount();
     S.phase = "windup";
@@ -811,8 +842,7 @@ async function resolveGroundBall(bat, pos) {
     showBallAt(drop);
     await moveDef(pos, drop, 450); // and he goes after it
     hideBall();
-    advanceSlots(1, 2); // batter to first; runners get the error bonus (+1 over a single)
-    await runRunners(1, 2);
+    await adv(1, 2); // error: batter first, runners second
     endPA("hit");
     returnDefs();
     return;
@@ -835,8 +865,7 @@ async function resolveGroundBall(bat, pos) {
   // safe: batter reaches first, runners advance one base — he just holds the ball
   showBanner("SINGLE", "hit");
   log("INFIELD SINGLE: " + bat.name + " reaches first");
-  advanceSlots(1);
-  await runRunners(1);
+  await adv(1);
   endPA("hit");
   returnDefs();
 }
@@ -867,16 +896,14 @@ async function resolveFlyBall(bat, pos, stealRunner) {
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
     log("ERROR in the outfield \u2014 he boots it and chases it down; the batter takes first and every runner takes second safely");
-    advanceSlots(1, 2); // batter to first; runners get the error bonus (+1 over a fly-ball miss)
-    await runRunners(1, 2);
+    await adv(1, 2); // error: batter first, runners second
     endPA("hit");
     returnDefs();
     return;
   }
   showBanner("FLY BALL", "hit");
   log("Fly ball drops \u2014 everyone advances one base");
-  advanceSlots(1);
-  await runRunners(1);
+  await adv(1);
   await offerExtraBase(pos, FB_THROW[pos], bat, stealRunner);
   endPA("hit");
   if (!S.extraBase) returnDefs(); // prompt pending? he holds the ball until you decide
@@ -908,16 +935,14 @@ async function resolveLineDrive(bat, pos, stealRunner) {
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
     log("ERROR \u2014 he boots it and chases it down; the batter takes second and every runner takes third safely");
-    advanceSlots(2, 3); // batter to second; runners get the error bonus (+1 over a line-drive miss)
-    await runRunners(2, 3);
+    await adv(2, 3); // error: batter second, runners third
     endPA("hit");
     returnDefs();
     return;
   }
   showBanner("LINE DRIVE", "hit");
   log("Line drive \u2014 batter and runners advance two bases");
-  advanceSlots(2);
-  await runRunners(2);
+  await adv(2);
   await offerExtraBase(pos, LD_THROW[pos], bat, stealRunner);
   endPA("hit");
   if (!S.extraBase) returnDefs(); // prompt pending? he holds the ball until you decide
@@ -1063,22 +1088,21 @@ async function runRunner(el, path, legDur) {
   el._anim = false;
 }
 
-async function runRunners(fb, x) { // mirrors advanceSlots: batter takes fb bases, runners take x if given
+async function runRunners(fb, x, pre) { // animates every figure from its PRE-advance base to its new one
   const rF = x === undefined ? fb : x;
   const d = 450;
-  const oR = S.rotation.slice();
-  const oN = S
-.baseRunners.slice();
+  const oR = (pre && pre.rot) || S.rotation.slice();
   const jobs = [];
   for (let i = 0; i < 4; i++) {
-    if (!oR[i]) continue;
-    const el = document.getElementById(oR[i]);
+    const fig = oR[i];
+    if (!fig) continue;
+    const el = document.getElementById(fig);
     if (!el) continue;
     const land = i + (i === 0 ? fb : rF);
     const scored = land >= 4; // an advance that reaches home is a run — nobody wraps past it
     const tgt = scored ? -1 : land - 1;
     jobs.push(runRunner(el, runLegs(orderOf(i) - 1, tgt === -1 ? -1 : tgt), d).then(() => {
-      if (scored) walkToDugout(oR[i], P.home); // finished his run home — now to his own seat
+      if (scored) walkToDugout(fig, P.home); // finished his run home — now to his own seat
     }));
   }
   await Promise.all(jobs);
