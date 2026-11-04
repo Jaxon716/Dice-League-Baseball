@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "16";
+const GAME_VERSION = "17";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -596,6 +596,7 @@ function setupHalf() {
 }
 
 function moveSlot(from, to) { // rotate figure + runner from slot to slot (to may be 0 = scored)
+  if (from === 0 && !S.rotation[0]) claimPlateFigure();
   const fig = S.rotation[from];
   let run = S.baseRunners[from];
   if (from === 0 && !run) run = batter(); // the batter becomes a baserunner on the bases
@@ -610,6 +611,7 @@ function moveSlot(from, to) { // rotate figure + runner from slot to slot (to ma
 
 async function advanceSlots(fb) { // everyone advances fb bases around the diamond — nobody runs past home
   const rot = S.rotation.slice(), run = S.baseRunners.slice();
+  if (!rot[0]) rot[0] = claimPlateFigure(); // the batter must exist before he can advance — never spawn a figureless runner
   if (rot[0]) run[0] = batter(); // the batter at the plate becomes a runner
   S.rotation = [null, null, null, null]; S.baseRunners = [null, null, null, null];
   for (let i = 0; i < 4; i++) {
@@ -650,6 +652,7 @@ async function resolveCount() {
     }
     if (S.balls >= 4) { // Stater walk: batter to 1st, only forced runners advance
       showBanner("WALK", "walk"); log("WALK");
+      if (!S.rotation[0]) claimPlateFigure(); // the walked batter needs his figure before he can take first
       // deepest first: 3rd scores only if 1st & 2nd were occupied (force chain)
       const movers = [];
       if (S.rotation[1] && S.rotation[2] && S.rotation[3]) movers.push([3, 0]);
@@ -1123,6 +1126,27 @@ async function walkToDugout(elId, fromPt) {
   S.retiring = S.retiring.filter(x => x !== elId);
   // the plate traffic just cleared — this render releases the next batter from the dugout
   if (S && S.screen === "game" && !S.animating && !S.awaitNext) render();
+}
+
+function claimPlateFigure() { // guarantees the current batter HAS a figure before he can advance
+  if (S.rotation[0]) return S.rotation[0];
+  let id = "off" + (S.batIdx % 9);
+  if (S.rotation.includes(id) || S.retiring.includes(id) || S.walkingOut.includes(id)) {
+    for (let i = 0; i < 9; i++) {
+      const cid = "off" + i;
+      if (!S.rotation.includes(cid) && !S.retiring.includes(cid) && !S.walkingOut.includes(cid)) { id = cid; break; }
+    }
+  }
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.transition = "none";
+    setXY(el, benchPos(parseInt(id.slice(3), 10)), 1.0);
+    el.dataset.base = "bench";
+    el.style.opacity = "1";
+  }
+  S.rotation[0] = id;
+  S.baseRunners[0] = null;
+  return id;
 }
 
 function sendBatterOut() {
