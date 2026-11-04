@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "21";
+const GAME_VERSION = "22";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -635,9 +635,7 @@ async function runRunners(fb, x, pre) { // animates every figure from its PRE-ad
 
 async function adv
 (fb, x
-) { // state
- advance
- + runs
+) { // state: advance, then animated runs
   const pre = await advanceSlots(fb, x);
   await runRunners(fb, x, pre);
 }
