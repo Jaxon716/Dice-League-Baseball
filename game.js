@@ -269,6 +269,32 @@ function pop(id, cls) {
   });
 }
 
+/* ---- defense choreography: fielders field, chase drops, throw to each other ---- */
+function getDefPt(pos) {
+  return S.defPos && S.defPos[pos] ? S.defPos[pos] : (P.def[pos] || [200, 220]);
+}
+async function moveDef(pos, to, dur) { // a fielder moves to a spot (chasing a dropped ball)
+  const el = document.getElementById("def" + pos);
+  if (!el) return;
+  await glide(el, getDefPt(pos), to, dur || 450);
+  if (!S.defPos) S.defPos = {};
+  S.defPos[pos] = to;
+}
+function returnDefs() { // fire-and-forget: displaced fielders jog back to their stations
+  Object.keys(S.defPos || {}).forEach(pos => {
+    const cur = S.defPos[pos], home = P.def[pos];
+    if (home && (Math.abs(cur[0] - home[0]) > 1 || Math.abs(cur[1] - home[1]) > 1)) moveDef(pos, home, 600);
+  });
+}
+function showBallAt(pt) { // leave the ball lying where it dropped while a fielder recovers it
+  const b = document.getElementById("ball");
+  if (b) { b.style.transition = "none"; setXY(b, pt); b.style.opacity = "1"; }
+}
+function hideBall() {
+  const b = document.getElementById("ball");
+  if (b) b.style.opacity = "0";
+}
+
 function swingBatter(type) {
   const el = document.querySelector(".atbat");
   if (!el) { await0(250); return; }
@@ -530,7 +556,7 @@ function startGame() {
   S.retiring = []; S.walkingOut = [];
   S.inning = 1; S.isBottom = false;
   S.outs = 0; S.balls = 0; S.strikes = 0;
-  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0;
+  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0; S.defPos = {};
   S.walkOff = false;
   S.lastSwing = null; S.lastCombo = null;
   S.stealPending = null; S.animating = false; S.pauseOpen = false; S.awaitNext = null;
@@ -765,30 +791,49 @@ async function resolveGroundBall(bat, pos) {
   const roll = fRoll + fm - rm;
   const err = fRoll === 1;
   log("GROUND BALL to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (fm ? (fm > 0 ? "+" : "") + fm : "") + " vs " + target + (err ? " \u2014 ERROR!" : ""));
-  await ballTo(P.home, P.def[pos] ? [P.def[pos][0], P.def[pos][1]] : [200, 220], 500);
-  pop("def" + pos, "throwing");
+  const spot = getDefPt(pos);
+  await ballTo(P.home, spot, 500);
+  pop("def" + pos, "catchpop"); // he fields it cleanly
 
   if (err) {
     showBanner("ERROR!", "foul");
-    log("ERROR by " + pos + " \u2014 everyone advances an extra base safely");
+    log("ERROR by " + pos + " \u2014 he bobbles it and has to chase it down; everyone advances an extra base safely");
+    const drop = grassGap(spot);
+    await ballTo(spot, drop, 300); // the ball squirts away from him
+    showBallAt(drop);
+    await moveDef(pos, drop, 450); // and he goes after it
+    hideBall();
+    await ballTo(getDefPt(pos), P.def["2B"], 300); // then fires it back to the infield
+    pop("def2B", "catchpop");
     advanceSlots(2); // batter +2, runners +2 (one extra than a normal hit)
     await runRunners(2);
     endPA("hit");
+    returnDefs();
     return;
   }
   if (roll > target) {
     showBanner("OUT!", "out");
     log("GROUND OUT: " + pos + " throws out " + bat.name);
+    if (pos === "1B" || pos === "P") {
+      pop("def" + pos, "catchpop"); // he just steps on his own bag with the ball
+    } else {
+      await ballTo(spot, basePt(0), 350); // fires to first
+      pop("def1B", "catchpop"); // and the first baseman takes it
+    }
     S.outs++;
     endPA("out"); // only the batter is out on a grounder — runners hold their bases
+    returnDefs();
     return;
   }
-  // safe: batter reaches first, runners advance one base
+  // safe: batter reaches first, runners advance one base — he holds it, then tosses it in
   showBanner("SINGLE", "hit");
   log("INFIELD SINGLE: " + bat.name + " reaches first");
+  await ballTo(spot, P.def["2B"], 300);
+  pop("def2B", "catchpop");
   advanceSlots(1);
   await runRunners(1);
   endPA("hit");
+  returnDefs();
 }
 
 async function resolveFlyBall(bat, pos, stealRunner) {
@@ -805,14 +850,22 @@ async function resolveFlyBall(bat, pos, stealRunner) {
     log("FLY OUT: " + fielder.name + " robs " + bat.name);
     S.outs++;
     endPA("out");
+    await ballTo(getDefPt(pos), P.def["2B"], 300); // and he fires it back to the infield
+    pop("def2B", "catchpop");
+    returnDefs();
     return;
   }
+  // he can't come up with it — it drops, and he trots over to recover it
+  showBallAt(land);
+  await moveDef(pos, land, 500);
+  hideBall();
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
-    log("ERROR in the outfield \u2014 everyone advances an extra base safely");
+    log("ERROR in the outfield \u2014 he boots it and chases it down; everyone advances an extra base safely");
     advanceSlots(3);
     await runRunners(3);
     endPA("hit");
+    returnDefs();
     return;
   }
   showBanner("FLY BALL", "hit");
@@ -821,6 +874,7 @@ async function resolveFlyBall(bat, pos, stealRunner) {
   await runRunners(1);
   await offerExtraBase(pos, FB_THROW[pos], bat, stealRunner);
   endPA("hit");
+  if (!S.extraBase) returnDefs(); // prompt pending? he holds the ball until you decide
 }
 
 async function resolveLineDrive(bat, pos, stealRunner) {
@@ -837,14 +891,22 @@ async function resolveLineDrive(bat, pos, stealRunner) {
     log("LINE OUT: " + fielder.name + " snares it");
     S.outs++;
     endPA("out");
+    await ballTo(getDefPt(pos), P.def["2B"], 300); // and he fires it back to the infield
+    pop("def2B", "catchpop");
+    returnDefs();
     return;
   }
+  // he can't come up with it — it drops, and he trots over to recover it
+  showBallAt(land);
+  await moveDef(pos, land, 500);
+  hideBall();
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
-    log("ERROR \u2014 everyone advances an extra base safely");
+    log("ERROR \u2014 he boots it and chases it down; everyone advances an extra base safely");
     advanceSlots(3);
     await runRunners(3);
     endPA("hit");
+    returnDefs();
     return;
   }
   showBanner("LINE DRIVE", "hit");
@@ -853,6 +915,7 @@ async function resolveLineDrive(bat, pos, stealRunner) {
   await runRunners(2);
   await offerExtraBase(pos, LD_THROW[pos], bat, stealRunner);
   endPA("hit");
+  if (!S.extraBase) returnDefs(); // prompt pending? he holds the ball until you decide
 }
 
 /* one extra-base attempt for the lead runner; fielder gets one throw.
@@ -882,8 +945,11 @@ async function attemptExtraBase(slot, pos, chart, stealRunner) {
   const roll = tRoll + skillMod(fielder.F) - skillMod(runner.R);
   log(runner.name + " tries for an extra base \u2014 " + fielder.name + " throws (" + roll + " vs " + target + ")");
   const from = basePt(slot - 1);
-  await ballTo(P.home, P.def[pos], 350);
+  const destPt = dest === 4 ? P.home : basePt(dest - 1);
+  const cover = dest === 4 ? "C" : dest === 3 ? "3B" : "2B";
+  await ballTo(getDefPt(pos), destPt, 350); // the throw comes from where he recovered the ball
   pop("def" + pos, "throwing");
+  pop("def" + cover, "catchpop"); // and the covering fielder takes it at the bag
   if (roll > target) {
     log("THROWN OUT at " + ["", "first", "second", "third", "home"][dest] + "!");
     showBanner("OUT!", "out");
@@ -932,6 +998,7 @@ async function resolveSteals() {
   log("STEAL ATTEMPT: " + runner.name + " \u2014 " + catcher.name + " throws (" + roll + " vs " + target + ")");
   await ballTo(P.catcher, basePt(baseIdx), 350);
   pop("defC", "throwing");
+  pop("def" + (baseIdx === 0 ? "2B" : "3B"), "catchpop"); // the covering fielder takes the throw
   if (roll > target) {
     log("THROWN OUT stealing!");
     showBanner("CAUGHT STEALING!", "caught");
@@ -1065,7 +1132,7 @@ async function halfInningSwitch() {
     return wait(idx * 60).then(() => {
       el.classList.add("running");
       const spot = [oldFldDug[0] + (idx % 3) * 16 - 16, oldFldDug[1] + Math.floor(idx / 3) * 9 - 4];
-      return glide(el, P.def[k], spot, legDur).then(() => {
+      return glide(el, getDefPt(k), spot, legDur).then(() => {
         el.classList.remove("running");
         el.style.opacity = "0";
       });
@@ -1122,6 +1189,7 @@ async function halfInningSwitch() {
       return glide(d, start, P.def[k], legDur).then(() => d.classList.remove("running"));
     });
   }));
+  S.defPos = {};
 }
 
 async function onContinue() {
@@ -1958,6 +2026,7 @@ async function onExtraBase(send) {
   S.animating = true;
   render();
   if (send) await attemptExtraBase(eb.slot, eb.pos, eb.chart, eb.stealRunner);
+  returnDefs();
   await resolveCount();
   S.phase = "windup";
   S.animating = false;
