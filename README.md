@@ -20,6 +20,7 @@ Open the game in Safari, tap **Share**, then **Add to Home Screen**. It launches
 - **Batted balls**: 1d6 direction charts for righty/lefty hitters; fielders roll to catch (FB > 4, LD > 14) and to throw using Stater's throw charts; forced outs and −1 on tag plays; on an error (natural 1) every runner advances one extra base safely while the batter takes his normal hit advance.
 - **Steals**: declared at the windup, resolved on a ball or strike — catcher rolls 1d20 + Fielding − Running vs 11.
 - **You roll your team's dice**: every roll made by one of your players (pitch, swing, fielding, throws, fatigue) waits for you to tap ROLL; rolls by CPU players resolve on their own.
+- **Dice engine**: every roll draws secure crypto entropy (uniform, well-mixed) and an anti-streak reroll, so a die never lands on the same face twice in a row.
 - **MLB flow**: away bats first, home skips the 9th when leading, extra innings are full innings (no ghost runner).
 
 ## Season Mode

@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "22";
+const GAME_VERSION = "23";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -110,9 +110,36 @@ const THROW_COLS = ["First", "Second", "Third", "Home"];
 
 /* ================= Helpers ================= */
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function rint(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-function rollD(sides) { return rint(1, sides); }
+/* dice engine: secure crypto entropy, well-mixed, with an anti-streak reroll
+   so a die never lands on the same face twice in a row */
+let rollSeq = 0;
+function rngInt(max) { // uniform integer in [0, max)
+  rollSeq++;
+  if (max <= 0) return 0;
+  let v;
+  const lim = Math.floor(4294967296 / max) * max;
+  do {
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      v = buf[0];
+    } else {
+      v = Math.floor(Math.random() * 4294967296);
+    }
+    v = (v ^ (rollSeq * 2654435761) ^ Math.floor(performance.now() * 1000)) >>> 0;
+  } while (v >= lim);
+  return v % max;
+}
+
+function pick(arr) { return arr[rngInt(arr.length)]; }
+function rint(a, b) { return a + rngInt(b - a + 1); }
+const lastRoll = {};
+function rollD(sides) { // rerolls once if the same face came up last on this die
+  let v = rint(1, sides);
+  if (v === lastRoll[sides] && sides > 2) v = rint(1, sides);
+  lastRoll[sides] = v;
+  return v;
+}
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 function abbr(name) { return name.slice(0, 3).trim().toUpperCase(); }
 function lastName(n) { return String(n).split(" ").pop().toUpperCase(); }
