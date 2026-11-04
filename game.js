@@ -348,7 +348,19 @@ function buildField() {
 
 function updateField() {
   if (!S || S.screen !== "game") return;
-  sendBatterOut();
+  // self-heal: any retired figure whose walk home got interrupted snaps to his own seat
+  S.retiring.slice().forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._anim) {
+      const i = parseInt(id.slice(3), 10);
+      el.style.transition = "none";
+      setXY(el, benchPos(i));
+      el.dataset.base = "bench";
+      S.retiring = S.retiring.filter(x => x !== id);
+    }
+  });
+  // one guy at the plate area at a time: the next batter waits until the last one cleared
+  if (!S.retiring.length && !S.walkingOut.length) sendBatterOut();
   if (S._colKey !== String(S.isBottom)) {
     S._colKey = String(S.isBottom);
     const defC = fieldingTeam() ? teamColors(fieldingTeam()) : null;
@@ -379,7 +391,7 @@ function updateField() {
     }
     el.classList.toggle("atbat", slot === 0);
     el.style.opacity = "1";
-    if (slot === 0) { setXY(el, P.home); el.dataset.base = "-1"; continue; }
+    if (slot === 0) { setXY(el, batBoxPt()); el.dataset.base = "-1"; continue; }
     el.dataset.base = String(slot - 1);
     setXY(el, basePt(slot - 1));
   }
@@ -569,7 +581,7 @@ async function advanceSlots(fb) { // every occupant advances fb slots; crossers 
 function endPA(kind) { // kind: 'out' | 'walk' | 'hit'
   if (kind !== "hit") {
     const fig = S.rotation[0];
-    if (fig) { S.retiring.push(fig); walkToDugout(fig, P.home); }
+    if (fig) { S.retiring.push(fig); walkToDugout(fig, batBoxPt()); }
     S.rotation[0] = null; S.baseRunners[0] = null;
   }
   S.batIdx = (S.batIdx + 1) % 9;
@@ -601,7 +613,9 @@ async function resolveCount() {
         const fig = S.rotation[from];
         const el = fig && document.getElementById(fig);
         if (!el) return Promise.resolve();
-        return runRunner(el, runLegs(from === 0 ? 3 : from - 1, to === 0 ? 3 : to - 1), 450);
+        return runRunner(el, from === 0
+          ? [[batBoxPt(), basePt(0)]] // the batter jogs out of the box to first
+          : runLegs(from === 0 ? 3 : from - 1, to === 0 ? 3 : to - 1), 450);
       }));
       const scoredFig = movers.some(([, to]) => to === 0) ? S.rotation[3] : null;
       movers.forEach(([from, to]) => moveSlot(from, to));
@@ -993,6 +1007,11 @@ async function runRunners(fb) {
 function benchPos(i) { const d = dugoutPos(); return [d[0] + BENCH_OFFSETS[i][0], d[1] + BENCH_OFFSETS[i][1]]; }
 function dugoutPos() { return battingTeam() === S.home ? P.dugoutH : P.dugoutV; }
 function defDugoutPos() { return fieldingTeam() === S.home ? P.dugoutH : P.dugoutV; }
+function batBoxPt() { // batters stand in the batter's box beside the plate, not on top of the catcher
+  const bat = batter();
+  const lefty = bat && (bat.hand === "L" || (bat.hand === "S" && S.pitcher.hand === "R"));
+  return lefty ? [214, 290] : [186, 290];
+}
 
 async function walkToDugout(elId, fromPt) {
   const el = document.getElementById(elId);
@@ -1023,7 +1042,7 @@ function sendBatterOut() {
   setXY(el, benchPos(seat));
   el.classList.add("running");
   el.style.opacity = "1";
-  glide(el, benchPos(seat), P.home, 700).then(() => {
+  glide(el, benchPos(seat), batBoxPt(), 700).then(() => {
     el.dataset.base = "-1";
     S.walkingOut = S.walkingOut.filter(x => x !== id);
     el.style.transition = "";
@@ -1062,6 +1081,7 @@ async function halfInningSwitch() {
     el.style.opacity = "0";
     el.dataset.base = "bench";
   }
+  S.retiring = []; S.walkingOut = [];
 
   // 3. flip the half, recolor both squads, clear the bases and the count
   if (S.isBottom) { S.inning++; S.isBottom = false; }
