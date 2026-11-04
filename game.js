@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "28";
+const GAME_VERSION = "29";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -1106,7 +1106,14 @@ async function resolveSteals() {
   if (roll > target) {
     log("THROWN OUT stealing!");
     showBanner("CAUGHT STEALING!", "caught");
-    S.retiring.push(fig); walkToDugout(fig, basePt(baseIdx));
+    S.retiring.push(fig);
+    const rel = document.getElementById(fig);
+    if (rel) { // he takes off for the bag, then gets tagged out there
+      rel.classList.add("running");
+      await glide(rel, basePt(slot - 1), slot < 4 ? basePt(slot) : P.home, 350);
+      rel.classList.remove("running");
+    }
+    walkToDugout(fig, slot < 4 ? basePt(slot) : P.home);
     S.baseRunners[slot] = null; S.rotation[slot] = null;
     S.outs++;
   } else {
@@ -2164,6 +2171,7 @@ function onRoll(type) {
 }
 
 function onStealDeclare(baseIdx) {
+  if (S.animating || S.phase !== "windup") return; // only between pitches — never mid-play
   S.stealTry = S.stealTry === baseIdx ? null : baseIdx;
   render();
 }
