@@ -229,7 +229,7 @@ const P = {
   b: [[258, 240], [200, 182], [142, 240]],
   mound: [200, 244],
   catcher: [200, 314],
-  def: { "P": [200, 244], "C": [200, 314], "1B": [270, 244], "2B": [244, 198], "SS": [158, 198], "3B": [136, 252], "LF": [70, 116], "CF": [200, 78], "RF": [330, 116] },
+  def: { "P": [200, 244], "C": [200, 314], "1B": [270, 244], "2B": [244, 198], "SS": [158, 198], "3B": [136, 252], "LF": [93, 144], "CF": [200, 110], "RF": [307, 144] },
   land: { 1: [200, 125], 2: [300, 80], 3: [100, 68], 4: [200, 12] },
   foul: [[60, 252], [340, 252], [64, 328], [336, 328]],
   dugoutV: [110, 310], dugoutH: [290, 310]
@@ -1054,9 +1054,14 @@ function glide(el, from, to, dur) {
 }
 async function runRunner(el, path, legDur) {
   if (!el || !path.length) return;
+  el._anim = true; // hold the figure through every leg — no snap windows between bases
   el.classList.add("running");
-  for (const [from, to] of path) await glide(el, from, to, legDur);
+  for (const [from, to] of path) {
+    await glide(el, from, to, legDur);
+    el._anim = true; // re-assert immediately after each leg lands
+  }
   el.classList.remove("running");
+  el._anim = false;
 }
 
 async function runRunners(fb) {
@@ -1127,7 +1132,7 @@ function sendBatterOut() {
     el.style.transition = "";
     el.classList.remove("running");
     S.batterReady = true; // he's dug in — now the pitch prompt appears
-    render();
+    if (S.screen === "game" && !S.animating && !S.awaitNext) render();
   });
 }
 
