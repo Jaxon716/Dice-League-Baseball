@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "18";
+const GAME_VERSION = "19";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -387,8 +387,8 @@ function updateField() {
       S.retiring = S.retiring.filter(x => x !== id);
     }
   });
-  // one guy at the plate area at a time: the next batter waits until the last one cleared
-  if (!S.retiring.length && !S.walkingOut.length) sendBatterOut();
+  // one guy at the plate area at a time — and only between plays: no one steps out mid-play
+  if (S.phase === "windup" && !S.awaitNext && !S.retiring.length && !S.walkingOut.length) sendBatterOut();
   // repaint both squads whenever the teams change — never carry last game's colors over
   if (S._colKey !== String(S.isBottom)) {
     S._colKey = String(S.isBottom);
@@ -829,8 +829,6 @@ async function resolveGroundBall(bat, pos) {
     showBallAt(drop);
     await moveDef(pos, drop, 450); // and he goes after it
     hideBall();
-    await ballTo(getDefPt(pos), P.def["2B"], 300); // then fires it back to the infield
-    pop("def2B", "catchpop");
     advanceSlots(1, 2); // batter to first; runners get the error bonus (+1 over a single)
     await runRunners(1, 2);
     endPA("hit");
@@ -852,11 +850,9 @@ async function resolveGroundBall(bat, pos) {
     returnDefs();
     return;
   }
-  // safe: batter reaches first, runners advance one base — he holds it, then tosses it in
+  // safe: batter reaches first, runners advance one base — he just holds the ball
   showBanner("SINGLE", "hit");
   log("INFIELD SINGLE: " + bat.name + " reaches first");
-  await ballTo(spot, P.def["2B"], 300);
-  pop("def2B", "catchpop");
   advanceSlots(1);
   await runRunners(1);
   endPA("hit");
@@ -974,7 +970,7 @@ async function attemptExtraBase(slot, pos, chart, stealRunner) {
   const from = basePt(slot - 1);
   const destPt = dest === 4 ? P.home : basePt(dest - 1);
   const cover = dest === 4 ? "C" : dest === 3 ? "3B" : "2B";
-  moveDef(cover, destPt, 350); // the covering fielder breaks for the bag as the throw travels
+  if (roll > target) moveDef(cover, destPt, 350); // the covering fielder breaks for the bag only to record the out
   await ballTo(getDefPt(pos), destPt, 350); // the throw comes from where he recovered the ball
   pop("def" + pos, "throwing");
   pop("def" + cover, "catchpop"); // and he takes it there
@@ -1025,7 +1021,7 @@ async function resolveSteals() {
   const roll = cRoll + skillMod(catcher.F) - skillMod(runner.R);
   log("STEAL ATTEMPT: " + runner.name + " \u2014 " + catcher.name + " throws (" + roll + " vs " + target + ")");
   const cover = baseIdx === 0 ? "2B" : "3B";
-  moveDef(cover, basePt(baseIdx), 350); // the covering fielder breaks for the bag
+  if (roll > target) moveDef(cover, basePt(baseIdx), 350); // fielder breaks for the bag only on the tag out
   await ballTo(P.catcher, basePt(baseIdx), 350);
   pop("defC", "throwing");
   pop("def" + cover, "catchpop"); // and takes the throw there

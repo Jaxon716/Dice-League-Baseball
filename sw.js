@@ -1,5 +1,5 @@
 /* Service worker: caches the whole game so it plays offline */
-const CACHE = "dlb-v18";
+const CACHE = "dlb-v19";
 const ASSETS = [
   "./",
   "index.html",
