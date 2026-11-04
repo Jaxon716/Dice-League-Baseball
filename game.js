@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "23";
+const GAME_VERSION = "24";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -861,13 +861,13 @@ async function resolveGroundBall(bat, pos) {
 
   if (err) {
     showBanner("ERROR!", "foul");
-    log("ERROR by " + pos + " \u2014 he bobbles it and has to chase it down; the batter takes first and every runner takes second safely");
+    log("ERROR by " + pos + " \u2014 he bobbles it and has to chase it down; the batter takes first and every runner moves up one base safely");
     const drop = grassGap(spot);
     await ballTo(spot, drop, 300); // the ball squirts away from him
     showBallAt(drop);
     await moveDef(pos, drop, 450); // and he goes after it
     hideBall();
-    await adv(1, 2); // error: batter first, runners second
+    await adv(1, 1); // error: batter first, runners up one base only
     endPA("hit");
     returnDefs();
     return;
@@ -920,8 +920,8 @@ async function resolveFlyBall(bat, pos, stealRunner) {
   hideBall();
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
-    log("ERROR in the outfield \u2014 he boots it and chases it down; the batter takes first and every runner takes second safely");
-    await adv(1, 2); // error: batter first, runners second
+    log("ERROR in the outfield \u2014 he boots it and chases it down; the batter takes first and every runner moves up one base safely");
+    await adv(1, 1); // error: batter first, runners up one base only
     endPA("hit");
     returnDefs();
     return;
@@ -959,8 +959,8 @@ async function resolveLineDrive(bat, pos, stealRunner) {
   hideBall();
   if (fRoll === 1) {
     showBanner("ERROR!", "foul");
-    log("ERROR \u2014 he boots it and chases it down; the batter takes second and every runner takes third safely");
-    await adv(2, 3); // error: batter second, runners third
+    log("ERROR \u2014 he boots it and chases it down; the batter takes second and every runner takes two bases safely");
+    await adv(2, 2); // error: batter second, runners two bases
     endPA("hit");
     returnDefs();
     return;
