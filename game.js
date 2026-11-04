@@ -229,7 +229,7 @@ const P = {
   b: [[258, 240], [200, 182], [142, 240]],
   mound: [200, 244],
   catcher: [200, 314],
-  def: { "P": [200, 244], "C": [200, 314], "1B": [256, 222], "2B": [232, 202], "SS": [168, 202], "3B": [144, 222], "LF": [104, 161], "CF": [200, 127], "RF": [296, 161] },
+  def: { "P": [200, 244], "C": [200, 314], "1B": [270, 244], "2B": [244, 198], "SS": [158, 198], "3B": [136, 252], "LF": [70, 116], "CF": [200, 78], "RF": [330, 116] },
   land: { 1: [200, 125], 2: [300, 80], 3: [100, 68], 4: [200, 12] },
   foul: [[60, 252], [340, 252], [64, 328], [336, 328]],
   dugoutV: [110, 310], dugoutH: [290, 310]
@@ -503,7 +503,7 @@ function onRollDie() {
 
 /* missing geometry helpers (into the crowd / into the grass) */
 function crowdPt() { return [200 + (Math.random() * 150 - 75), 20 + Math.random() * 55]; }
-function grassGap(fallback) { return [fallback[0] + (Math.random() * 60 - 30), fallback[1] + (Math.random() * 50 - 25)]; }
+function grassGap(f, m) { const k = m || 1; return [f[0] + (Math.random() * 60 - 30) * k, f[1] + (Math.random() * 50 - 25) * k]; }
 
 /* ================= State ================= */
 
@@ -533,7 +533,8 @@ function freshState() {
     awaitNext: null, walkOff: false,
     season: null, seasonPending: false,
     quickSel: null,                            // quick game: which team slot we're picking ("Visitor"/"Home")
-    paCount: 0, coinFlipped: false, coinSide: null, coinResult: null, // matchup screen: coin toss / momentum
+    paCount: 0, batterReady: false, // the pitch prompt waits until the batter has dug in
+    coinFlipped: false, coinSide: null, coinResult: null, // matchup screen: coin toss / momentum
     teamSel: null, rosterSel: null
   };
 }
@@ -556,7 +557,7 @@ function startGame() {
   S.retiring = []; S.walkingOut = [];
   S.inning = 1; S.isBottom = false;
   S.outs = 0; S.balls = 0; S.strikes = 0;
-  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0; S.defPos = {};
+  S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0; S.defPos = {}; S.batterReady = false;
   S.walkOff = false;
   S.lastSwing = null; S.lastCombo = null;
   S.stealPending = null; S.animating = false; S.pauseOpen = false; S.awaitNext = null;
@@ -608,6 +609,7 @@ async function advanceSlots(fb) { // everyone advances fb bases around the diamo
 }
 
 function endPA(kind) { // kind: 'out' | 'walk' | 'hit'
+  S.batterReady = false; // the plate just changed hands — the next batter has to walk up first
   if (kind !== "hit") {
     const fig = S.rotation[0];
     if (fig) { S.retiring.push(fig); walkToDugout(fig, batBoxPt()); }
@@ -820,8 +822,9 @@ async function resolveGroundBall(bat, pos) {
     if (pos === "1B" || pos === "P") {
       pop("def" + pos, "catchpop"); // he just steps on his own bag with the ball
     } else {
+      moveDef("1B", basePt(0), 350); // the first baseman breaks for the bag as the throw travels
       await ballTo(spot, basePt(0), 350); // fires to first
-      pop("def1B", "catchpop"); // and the first baseman takes it
+      pop("def1B", "catchpop"); // and he takes it there
     }
     S.outs++;
     endPA("out"); // only the batter is out on a grounder — runners hold their bases
@@ -845,7 +848,7 @@ async function resolveFlyBall(bat, pos, stealRunner) {
   const fRoll = await rollDie(20, "FLY BALL \u2014 " + lastName(fielder.name) + " (" + pos + ") (d20)", fieldingTeam() === userTeam());
   const caught = fRoll !== 1 && (fRoll + fm) > FB_CATCH;
   log("FLY BALL to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (caught ? " \u2014 CAUGHT!" : " \u2014 dropped in!"));
-  const land = caught ? P.def[pos] : grassGap([150, 185]);
+  const land = caught ? getDefPt(pos) : grassGap(getDefPt(pos), 0.6);
   await ballTo(P.home, land, 600);
   if (caught) {
     pop("def" + pos, "catchpop");
@@ -886,7 +889,7 @@ async function resolveLineDrive(bat, pos, stealRunner) {
   const fRoll = await rollDie(20, "LINE DRIVE \u2014 " + lastName(fielder.name) + " (" + pos + ") (d20)", fieldingTeam() === userTeam());
   const caught = fRoll !== 1 && (fRoll + fm) > LD_CATCH;
   log("LINE DRIVE to " + pos + " \u2014 " + fielder.name + " rolls " + fRoll + (caught ? " \u2014 SNAGGED!" : " \u2014 through the gap!"));
-  const land = caught ? P.def[pos] : grassGap([160, 190]);
+  const land = caught ? getDefPt(pos) : grassGap(getDefPt(pos), 0.6);
   await ballTo(P.home, land, 600);
   if (caught) {
     pop("def" + pos, "catchpop");
@@ -950,9 +953,10 @@ async function attemptExtraBase(slot, pos, chart, stealRunner) {
   const from = basePt(slot - 1);
   const destPt = dest === 4 ? P.home : basePt(dest - 1);
   const cover = dest === 4 ? "C" : dest === 3 ? "3B" : "2B";
+  moveDef(cover, destPt, 350); // the covering fielder breaks for the bag as the throw travels
   await ballTo(getDefPt(pos), destPt, 350); // the throw comes from where he recovered the ball
   pop("def" + pos, "throwing");
-  pop("def" + cover, "catchpop"); // and the covering fielder takes it at the bag
+  pop("def" + cover, "catchpop"); // and he takes it there
   if (roll > target) {
     log("THROWN OUT at " + ["", "first", "second", "third", "home"][dest] + "!");
     showBanner("OUT!", "out");
@@ -999,9 +1003,11 @@ async function resolveSteals() {
   const cRoll = await rollDie(20, "STEAL THROW \u2014 " + lastName(catcher.name) + " (C) (d20)", fieldingTeam() === userTeam());
   const roll = cRoll + skillMod(catcher.F) - skillMod(runner.R);
   log("STEAL ATTEMPT: " + runner.name + " \u2014 " + catcher.name + " throws (" + roll + " vs " + target + ")");
+  const cover = baseIdx === 0 ? "2B" : "3B";
+  moveDef(cover, basePt(baseIdx), 350); // the covering fielder breaks for the bag
   await ballTo(P.catcher, basePt(baseIdx), 350);
   pop("defC", "throwing");
-  pop("def" + (baseIdx === 0 ? "2B" : "3B"), "catchpop"); // the covering fielder takes the throw
+  pop("def" + cover, "catchpop"); // and takes the throw there
   if (roll > target) {
     log("THROWN OUT stealing!");
     showBanner("CAUGHT STEALING!", "caught");
@@ -1015,6 +1021,7 @@ async function resolveSteals() {
     moveSlot(slot, toSlot);
     await runRunnerLeg(baseIdx + 2 <= 3 ? baseIdx + 2 : 0);
   }
+  returnDefs();
 }
 
 /* ================= base running animation ================= */
@@ -1117,6 +1124,8 @@ function sendBatterOut() {
     S.walkingOut = S.walkingOut.filter(x => x !== id);
     el.style.transition = "";
     el.classList.remove("running");
+    S.batterReady = true; // he's dug in — now the pitch prompt appears
+    render();
   });
 }
 
@@ -1161,6 +1170,7 @@ async function halfInningSwitch() {
   S.rotation = [null, null, null, null];
   S.baseRunners = [null, null, null, null];
   S.retiring = []; S.walkingOut = [];
+  S.batterReady = false;
   S._colKey = String(S.isBottom);
   const offC = teamColors(battingTeam()), defC = teamColors(fieldingTeam());
   for (let i = 0; i < 9; i++) {
@@ -1680,6 +1690,8 @@ function renderFieldUI() {
     rollHtml = '<div class="diebox ' + (pr.auto ? "cpu" : "user") + '"><div class="dielabel">' + esc(pr.label) + '</div>' +
       dieHtml(pr.done ? pr.value : null) + '</div>' +
       (pr.done ? "" : '<button class="btn rollbtn" data-action="roll-die" style="flex:0 0 auto">ROLL</button>');
+  } else if (S.phase === "windup" && !S.batterReady) {
+    rollHtml = '<div class="dielabel" style="padding:8px">THE BATTER IS DIGGING IN\u2026</div>';
   } else if (S.phase === "windup") {
     if (up) {
       rollHtml = PITCH_TYPES.map(t => '<button class="btn rollbtn" data-action="pitch" data-type="' + t + '" ' + (S.animating ? "disabled" : "") + '>' + t.toUpperCase() + '</button>').join("");
@@ -2010,7 +2022,7 @@ function newSeason() {
 /* ================= roll handlers ================= */
 
 function onRoll(type) {
-  if (!S || S.screen !== "game" || S.pauseOpen || S.awaitNext || S.animating || S.pendingRoll) return;
+  if (!S || S.screen !== "game" || S.pauseOpen || S.awaitNext || S.animating || S.pendingRoll || !S.batterReady) return;
   if (S.phase !== "windup") return;
   S.animating = true;
   render();
@@ -2212,7 +2224,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter") {
     e.preventDefault();
     if (S.pendingRoll) onRollDie();
-    else if (!S.animating && S.phase === "windup" && !userIsPitcher()) onRoll(pick(PITCH_TYPES));
+    else if (!S.animating && S.phase === "windup" && S.batterReady && !userIsPitcher()) onRoll(pick(PITCH_TYPES));
   }
 });
 
