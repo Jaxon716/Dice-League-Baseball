@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "24";
+const GAME_VERSION = "25";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -144,7 +144,16 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function abbr(name) { return name.slice(0, 3).trim().toUpperCase(); }
 function lastName(n) { return String(n).split(" ").pop().toUpperCase(); }
 function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
-function nextFrame() { return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))); }
+function nextFrame() { // resolves on the next painted frame — or falls back to a
+  // timer if that frame never fires (iOS can drop rAF when the app is
+  // backgrounded mid-animation, which used to freeze the batter's walk-up)
+  return new Promise(res => {
+    let done = false;
+    const go = () => { if (done) return; done = true; res(); };
+    requestAnimationFrame(() => requestAnimationFrame(go));
+    setTimeout(go, 150);
+  });
+}
 function teamColors(t) { return TEAM_COLORS[t.name] || ["#5a6878", "#cfd8e0"]; }
 function skillMod(score) { return score <= 3 ? -3 : score <= 5 ? -2 : score <= 8 ? -1 : score <= 12 ? 0 : score <= 15 ? 1 : score <= 17 ? 2 : 3; }
 function baseOccupied(i) { return !!S.rotation[i + 1]; } // i = 0-based base (0 = 1st)
