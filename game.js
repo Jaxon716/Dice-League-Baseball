@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "15";
+const GAME_VERSION = "16";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -237,11 +237,11 @@ const P = {
   dugoutV: [110, 310], dugoutH: [290, 310]
 };
 
-const BENCH_OFFSETS = [[-52, 4], [-26, 8], [0, 10], [26, 8], [52, 4], [-39, 18], [-13, 20], [13, 20], [39, 18]];
+const BENCH_OFFSETS = [[-20, 2], [-15, 6], [-10, 1], [-5, 5], [0, 0], [5, 5], [10, 1], [15, 6], [20, 2]]; // tight row inside the dugout box
 
 function basePt(i) { return P.b[i]; }
-function setXY(el, p) {
-  const t = "translate(" + p[0] + "px, " + p[1] + "px) scale(1.15)";
+function setXY(el, p, scale) {
+  const t = "translate(" + p[0] + "px, " + p[1] + "px) scale(" + (scale || 1.15) + ")";
   if (el._t !== t) { el._t = t; el.style.transform = t; }
 }
 
@@ -350,7 +350,7 @@ function buildField() {
     '<g clip-path="url(#grassclip)">' + stripes + '</g>' +
     '<path d="M200 295 L' + (200 - 250 * Math.sin(a)) + ' ' + (295 - 250 * Math.cos(a)) +
       ' M200 295 L' + (200 + 250 * Math.sin(a)) + ' ' + (295 - 250 * Math.cos(a)) + '" stroke="#f2f2f2" stroke-width="3"/>' +
-    '<circle cx="200" cy="234" r="76" fill="#c9a166"/>' +
+    '<circle cx="200" cy="226" r="60" fill="#c9a166"/>' +
     '<rect x="-34" y="-34" width="68" height="68" fill="#2e7d32" transform="translate(200 238) rotate(45)"/>' +
     '<circle cx="200" cy="246" r="12" fill="#cfae72"/>' +
     '<circle cx="200" cy="292" r="28" fill="#c9a166"/>' +
@@ -428,7 +428,7 @@ function updateField() {
       el.classList.remove("atbat");
       el.dataset.base = "bench";
       el.style.opacity = "1";
-      setXY(el, benchPos(i));
+      setXY(el, benchPos(i), 1.0); // seated in the dugout, tucked in tight
       continue;
     }
     el.classList.toggle("atbat", slot === 0);
@@ -1118,6 +1118,8 @@ async function walkToDugout(elId, fromPt) {
   el.classList.add("running");
   await glide(el, fromPt, benchPos(parseInt(elId.slice(3), 10)), 800);
   el.dataset.base = "bench";
+  el.style.transition = "none";
+  setXY(el, benchPos(parseInt(elId.slice(3), 10)), 1.0); // settles into his dugout seat, tucked in
   S.retiring = S.retiring.filter(x => x !== elId);
   // the plate traffic just cleared — this render releases the next batter from the dugout
   if (S && S.screen === "game" && !S.animating && !S.awaitNext) render();
@@ -1180,7 +1182,7 @@ async function halfInningSwitch() {
     const el = document.getElementById("off" + i);
     if (!el) continue;
     el.style.transition = "none";
-    setXY(el, benchPos(i));
+    setXY(el, benchPos(i), 1.0);
     el.style.opacity = "0";
     el.dataset.base = "bench";
   }
@@ -1209,7 +1211,7 @@ async function halfInningSwitch() {
     const el = document.getElementById("off" + i);
     if (!el) continue;
     el.style.transition = "none";
-    setXY(el, benchPos(i));
+    setXY(el, benchPos(i), 1.0);
     el.style.opacity = "1";
   }
 
