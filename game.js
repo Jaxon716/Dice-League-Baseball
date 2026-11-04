@@ -749,17 +749,16 @@ async function resolveGroundBall(bat, pos) {
     log("ERROR by " + pos + " \u2014 everyone advances an extra base safely");
     advanceSlots(2); // batter +2, runners +2 (one extra than a normal hit)
     await runRunners(2);
+    endPA("hit");
     return;
   }
   if (roll > target) {
     showBanner("OUT!", "out");
     log("GROUND OUT: " + pos + " throws out " + bat.name);
-    const fig = S.rotation[0];
-    if (fig) { S.retiring.push(fig); walkToDugout(fig, P.home); }
-    S.rotation[0] = null; S.baseRunners[0] = null;
     S.outs++;
     // forced runners still advance one base
     if (S.rotation[1]) moveSlot(1, 2);
+    endPA("out"); // retire the batter, advance the lineup, clear the count
     return;
   }
   // safe: batter reaches first, runners advance one base
@@ -767,6 +766,7 @@ async function resolveGroundBall(bat, pos) {
   log("INFIELD SINGLE: " + bat.name + " reaches first");
   advanceSlots(1);
   await runRunners(1);
+  endPA("hit");
 }
 
 async function resolveFlyBall(bat, pos) {
@@ -781,10 +781,8 @@ async function resolveFlyBall(bat, pos) {
     pop("def" + pos, "catchpop");
     showBanner("OUT!", "out");
     log("FLY OUT: " + fielder.name + " robs " + bat.name);
-    const fig = S.rotation[0];
-    if (fig) { S.retiring.push(fig); walkToDugout(fig, P.home); }
-    S.rotation[0] = null; S.baseRunners[0] = null;
     S.outs++;
+    endPA("out");
     return;
   }
   if (fRoll === 1) {
@@ -792,6 +790,7 @@ async function resolveFlyBall(bat, pos) {
     log("ERROR in the outfield \u2014 everyone advances an extra base safely");
     advanceSlots(3);
     await runRunners(3);
+    endPA("hit");
     return;
   }
   showBanner("FLY BALL", "hit");
@@ -799,6 +798,7 @@ async function resolveFlyBall(bat, pos) {
   advanceSlots(1);
   await runRunners(1);
   await offerExtraBase(pos, FB_THROW[pos], bat, 0);
+  endPA("hit");
 }
 
 async function resolveLineDrive(bat, pos) {
@@ -813,10 +813,8 @@ async function resolveLineDrive(bat, pos) {
     pop("def" + pos, "catchpop");
     showBanner("OUT!", "out");
     log("LINE OUT: " + fielder.name + " snares it");
-    const fig = S.rotation[0];
-    if (fig) { S.retiring.push(fig); walkToDugout(fig, P.home); }
-    S.rotation[0] = null; S.baseRunners[0] = null;
     S.outs++;
+    endPA("out");
     return;
   }
   if (fRoll === 1) {
@@ -824,6 +822,7 @@ async function resolveLineDrive(bat, pos) {
     log("ERROR \u2014 everyone advances an extra base safely");
     advanceSlots(3);
     await runRunners(3);
+    endPA("hit");
     return;
   }
   showBanner("LINE DRIVE", "hit");
@@ -831,6 +830,7 @@ async function resolveLineDrive(bat, pos) {
   advanceSlots(2);
   await runRunners(2);
   await offerExtraBase(pos, LD_THROW[pos], bat, 1);
+  endPA("hit");
 }
 
 /* one extra-base attempt for the lead runner; fielder gets one throw */
