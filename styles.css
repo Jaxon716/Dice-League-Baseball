@@ -446,6 +446,23 @@ body {
 .swingtip .bat { animation: battip 0.3s ease; }
 @keyframes battip { 45% { transform: rotate(-55deg); } }
 
+/* bat-meets-ball: spark on the bat tip + impact rings at the plate */
+.spark { transform-box: fill-box; transform-origin: 50% 50%; }
+.swing .spark { animation: sparkburst 0.42s ease; }
+@keyframes sparkburst {
+  0% { opacity: 0; transform: scale(0.4); }
+  30% { opacity: 1; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+#contactfx { transform-box: fill-box; transform-origin: 50% 50%; }
+#contactfx.flash { animation: contactflash 0.4s ease-out; }
+@keyframes contactflash {
+  0% { opacity: 0.95; transform: scale(0.3); }
+  45% { opacity: 1; transform: scale(1.35); }
+  100% { opacity: 0; transform: scale(2.1); }
+}
+
 /* ---------- Outcome banners ---------- */
 .banner {
   position: absolute;

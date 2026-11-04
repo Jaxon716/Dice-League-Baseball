@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "25";
+const GAME_VERSION = "26";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -287,7 +287,19 @@ function jersey(id, cls, withBat) {
     '<g class="body">' +
     '<rect class="leg1" x="-2.6" y="2" width="2" height="5" rx="0.8" fill="#e8e8e8" stroke="#999" stroke-width="0.5"/>' +
     '<rect class="leg2" x="0.6" y="2" width="2" height="5" rx="0.8" fill="#e8e8e8" stroke="#999" stroke-width="0.5"/>' +
-    (withBat ? '<rect class="bat" x="1" y="-8" width="1.6" height="7" rx="0.8" fill="#c88540"/>' : "") +
+    (withBat ?
+      '<g class="bat">' +
+      '<rect x="0.5" y="-1.6" width="3.2" height="1.7" rx="0.8" fill="#8a5a2b"/>' +
+      '<rect x="1.1" y="-10.2" width="2.2" height="9.2" rx="1.1" fill="#c88540"/>' +
+      '<rect x="1.5" y="-11.1" width="1.4" height="1.3" rx="0.65" fill="#e6b877"/>' +
+      '</g>' +
+      '<g transform="translate(4 -4)"><g class="spark" opacity="0">' +
+      '<circle r="1.1" fill="#fff"/>' +
+      '<circle cx="2.6" cy="-1" r="0.7" fill="#ffe066"/>' +
+      '<circle cx="-2.2" cy="1" r="0.6" fill="#ffe066"/>' +
+      '<circle cx="1.5" cy="2.4" r="0.55" fill="#fff"/>' +
+      '<circle cx="-1.5" cy="-2.3" r="0.5" fill="#fff"/>' +
+      '</g></g>' : "") +
     '<rect class="jersey" x="-4.5" y="-3.5" width="9" height="7.5" rx="1.5"/>' +
     '<circle cx="0" cy="-6" r="2.8" fill="' + skin + '"/>' +
     '<path class="cap" d="M-2.8 -6.6 A2.8 2.8 0 0 1 2.8 -6.6 Z"/>' +
@@ -340,6 +352,10 @@ function swingBatter(type) {
   if (!body) { await0(250); return; }
   const cls = type === "miss" ? "swingmiss" : type === "tip" ? "swingtip" : "swing";
   body.classList.remove("swing", "swingmiss", "swingtip");
+  if (cls === "swing") { // bat meets ball — flash the impact rings at the plate
+    const fx = document.getElementById("contactfx");
+    if (fx) { fx.classList.remove("flash"); fx.getBoundingClientRect(); fx.classList.add("flash"); }
+  }
   nextFrame().then(() => {
     body.classList.add(cls);
     setTimeout(() => body.classList.remove(cls), 620);
@@ -403,6 +419,11 @@ function buildField() {
     '</g>' +
     '<path d="M200 295 L258 240 M258 240 L200 182 M200 182 L142 240 M142 240 L200 295" stroke="#e9dcc0" stroke-width="1.5"/>' +
     baseSq(P.b[0]) + baseSq(P.b[1]) + baseSq(P.b[2]) +
+    '<g transform="translate(200 295)"><g id="contactfx" opacity="0">' +
+      '<circle r="5" fill="none" stroke="#ffffff" stroke-width="1.5"/>' +
+      '<circle r="9" fill="none" stroke="#ffe066" stroke-width="1.2"/>' +
+      '<circle r="13" fill="none" stroke="#ffffff" stroke-width="0.8"/>' +
+    '</g></g>' +
     '<path d="M195 292 L205 292 L205 298 L200 301 L195 298 Z" fill="#e8e8e8" stroke="#777"/>' +
     defs +
     [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => jersey("off" + i, "off", true)).join("") +
