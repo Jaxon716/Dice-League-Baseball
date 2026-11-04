@@ -5,6 +5,8 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
+const GAME_VERSION = "15";
+
 /* ================= MLB teams, markets, colors ================= */
 
 const LEAGUES = {
@@ -387,6 +389,20 @@ function updateField() {
   });
   // one guy at the plate area at a time: the next batter waits until the last one cleared
   if (!S.retiring.length && !S.walkingOut.length) sendBatterOut();
+  // repaint both squads whenever the teams change — never carry last game's colors over
+  if (S._colKey !== String(S.isBottom)) {
+    S._colKey = String(S.isBottom);
+    const defC = fieldingTeam() ? teamColors(fieldingTeam()) : null;
+    const offC = battingTeam() ? teamColors(battingTeam()) : null;
+    for (let i = 0; i < 9; i++) {
+      const el = document.getElementById("off" + i);
+      if (el && offC) { el.style.setProperty("--p", offC[0]); el.style.setProperty("--s", offC[1]); }
+    }
+    Object.keys(P.def).forEach(k => {
+      const el = document.getElementById("def" + k);
+      if (el && defC) { el.style.setProperty("--p", defC[0]); el.style.setProperty("--s", defC[1]); }
+    });
+  }
   if (S._colKey !== String(S.isBottom)) {
     S._colKey = String(S.isBottom);
     const defC = fieldingTeam() ? teamColors(fieldingTeam()) : null;
@@ -558,6 +574,7 @@ function startGame() {
   S.inning = 1; S.isBottom = false;
   S.outs = 0; S.balls = 0; S.strikes = 0;
   S.phase = "windup"; S.pitchType = null; S.stealTry = null; S.extraBase = null; S.pendingRoll = null; S.paCount = 0; S.defPos = {}; S.batterReady = false;
+  S._colKey = null; // force a full repaint — never carry the previous game's colors over
   S.walkOff = false;
   S.lastSwing = null; S.lastCombo = null;
   S.stealPending = null; S.animating = false; S.pauseOpen = false; S.awaitNext = null;
@@ -1249,6 +1266,7 @@ function renderTitle() {
   return '<div class="bigscreen">' +
     '<div class="title-main">PEN &amp; PAPER<br>BASEBALL</div>' +
     '<div class="title-sub">STATER RULES &middot; MLB TEAMS</div>' +
+    '<div class="title-sub" style="font-size:10px;opacity:0.5">BUILD ' + GAME_VERSION + '</div>' +
     '<button class="btn" data-action="start" style="flex:none;min-width:200px">QUICK GAME</button>' +
     '<button class="btn ghost" data-action="profiles" style="flex:none;min-width:200px">SEASON MODE</button>' +
     '</div>';
