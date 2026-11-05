@@ -397,6 +397,16 @@ body {
 /* pitch trail — a short streak behind the ball so curve/slider break reads */
 .ptrail { fill: #dfe9f0; }
 
+/* the bat he leaves lying at the plate when he takes off */
+#droppedbat { transition: opacity 0.25s; }
+#droppedbat .dropshape { transform-box: fill-box; transform-origin: 50% 50%; }
+#droppedbat.drop .dropshape { animation: batdrop 0.45s ease-out; }
+@keyframes batdrop {
+  0% { transform: translate(0, -14px) rotate(-40deg); }
+  55% { transform: translate(0, 2px) rotate(8deg); }
+  100% { transform: none; }
+}
+
 
 /* ---------- Field stage ---------- */
 #fieldstage { position: relative; }

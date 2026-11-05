@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "31";
+const GAME_VERSION = "32";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -349,6 +349,27 @@ function hideBall() {
   if (b) b.style.opacity = "0";
 }
 
+/* ---- the bat he leaves behind: a batter who puts the ball in play drops his bat at the plate ---- */
+function dropBat(el) {
+  if (el) el.classList.remove("atbat"); // it's out of his hands now
+  const db = document.getElementById("droppedbat");
+  if (!db) return;
+  db.classList.remove("drop");
+  db.getBoundingClientRect(); // restart the fall animation
+  db.style.opacity = "1";
+  db.classList.add("drop");
+  clearTimeout(dropBat._t);
+  dropBat._t = setTimeout(clearDropBat, 4000);
+}
+
+function clearDropBat() {
+  clearTimeout(dropBat._t);
+  const db = document.getElementById("droppedbat");
+  if (!db) return;
+  db.classList.remove("drop");
+  db.style.opacity = "0";
+}
+
 function swingBatter(type) {
   const el = document.querySelector(".atbat");
   if (!el) { return await0(250); }
@@ -431,6 +452,13 @@ function buildField() {
     '<path d="M195 292 L205 292 L205 298 L200 301 L195 298 Z" fill="#e8e8e8" stroke="#777"/>' +
     defs +
     [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => jersey("off" + i, "off", true)).join("") +
+    '<g id="droppedbat" style="opacity:0" transform="translate(170 301) rotate(22)">' +
+      '<g class="dropshape">' +
+        '<rect x="-8" y="-1.5" width="2.4" height="3" rx="1" fill="#7a4a1e"/>' +
+        '<rect x="-6" y="-0.9" width="6" height="1.8" rx="0.9" fill="#b07a3c"/>' +
+        '<rect x="0" y="-1.6" width="8.5" height="3.2" rx="1.5" fill="#c88540"/>' +
+      '</g>' +
+    '</g>' +
     '<circle id="tr0" class="ptrail" r="2.6" style="opacity:0"></circle>' +
     '<circle id="tr1" class="ptrail" r="2" style="opacity:0"></circle>' +
     '<circle id="tr2" class="ptrail" r="1.5" style="opacity:0"></circle>' +
@@ -718,6 +746,7 @@ function startGame() {
   });
   const ball = document.getElementById("ball");
   if (ball) ball.style.opacity = "0";
+  clearDropBat();
   if (S.visitor && S.visitor.fatigueReset) [S.visitor, S.home].forEach(t => t.roster && t.roster.forEach(p => p.fatigue = 0));
   render();
 }
@@ -832,6 +861,7 @@ async function resolveCount() {
         const fig = S.rotation[from];
         const el = fig && document.getElementById(fig);
         if (!el) return Promise.resolve();
+        if (from === 0) dropBat(el); // the walked batter drops his bat too
         return runRunner(el, from === 0
           ? [[batBoxPt(), basePt(0)]] // the batter jogs out of the box to first
           : runLegs(from === 0 ? 3 : from - 1, to === 0 ? 3 : to - 1), 450);
@@ -1261,6 +1291,7 @@ async function runRunners(fb, x, pre) { // animates every figure from its PRE-ad
     const el = document.getElementById(fig);
     if (!el) continue;
     const land = i + (i === 0 ? fb : rF);
+    if (i === 0) dropBat(el); // he leaves his bat lying at the plate as he takes off
     const scored = land >= 4; // an advance that reaches home is a run — nobody wraps past it
     const tgt = scored ? -1 : land - 1;
     // a scoring batter (a home run) trots the whole diamond: plate → 1st → 2nd → 3rd → home
@@ -1348,6 +1379,7 @@ function sendBatterOut() {
     S.walkingOut = S.walkingOut.filter(x => x !== id);
     el.style.transition = "";
     el.classList.remove("running");
+    clearDropBat(); // the bat boy clears the last hitter's bat
     S.batterReady = true; // he's dug in — now the pitch prompt appears
     if (S.screen === "game" && !S.animating && !S.awaitNext) render();
   });
@@ -1394,6 +1426,7 @@ async function halfInningSwitch() {
   S.rotation = [null, null, null, null];
   S.baseRunners = [null, null, null, null];
   S.retiring = []; S.walkingOut = [];
+  clearDropBat(); // nothing left lying at the plate between halves
   S.batterReady = false;
   S._colKey = String(S.isBottom);
   const offC = teamColors(battingTeam()), defC = teamColors(fieldingTeam());
