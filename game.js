@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "32";
+const GAME_VERSION = "33";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -569,27 +569,56 @@ function quadPath(a, c, z, n) { // quadratic bezier: mound a, control c, plate z
   return pts;
 }
 
+/* breaking-ball shape: the pitcher's hand sets the natural side (a RHP's
+   breaker runs to screen right), with the odd backdoor/backup curve going
+   the other way. Size and bite vary pitch to pitch. */
+function breakShape(type) {
+  const hand = S && S.pitcher && S.pitcher.hand === "L" ? -1 : 1;
+  const backChance = type === "Curve" ? 22 : 16;
+  const back = rint(1, 100) <= backChance;
+  return {
+    side: back ? -hand : hand,
+    apex: rint(22, 40),
+    bite: rint(12, 22)
+  };
+}
+
+/* curve: a late bow — the sweep peaks past halfway and snaps back */
+function curvePath(a, z, sh) {
+  const c = [a[0] + sh.side * sh.apex * 2, a[1] + 34];
+  const end = [z[0] + sh.side * sh.apex * 0.15, z[1]];
+  return quadPath(a, c, end, 12);
+}
+
+/* slider: rides straight, then bites late at a sharp angle */
+function sliderPath(a, z, sh) {
+  const pts = [];
+  const n = 10;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const late = Math.max(0, (t - 0.42) / 0.58);
+    const lat = sh.side * sh.bite * late * late;
+    pts.push([a[0] + (z[0] - a[0]) * t + lat, a[1] + (z[1] - a[1]) * t]);
+  }
+  return pts;
+}
+
 async function pitchFlight(type) {
   // fastball: no break, straight and quick, growing at the hitter
-  // curve: a big bow that snaps back over the plate
-  // slider: rides straight, then bites hard to the glove side
+  // curve: a late bow — side and size change pitch to pitch
+  // slider: rides straight, then bites late at a varying angle
   const a = P.mound, z = P.home;
   const OPS = [0.45, 0.3, 0.16];
   let pts, dur;
   if (type === "Curve") {
-    pts = quadPath(a, [a[0] + 60, a[1] + 24], z, 10);
-    dur = 620;
+    pts = curvePath(a, z, breakShape(type));
+    dur = rint(560, 700);
   } else if (type === "Slider") {
-    pts = [];
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8;
-      const bite = -22 * Math.pow(t, 2.6);
-      pts.push([a[0] + (z[0] - a[0]) * t + bite, a[1] + (z[1] - a[1]) * t]);
-    }
-    dur = 430;
+    pts = sliderPath(a, z, breakShape(type));
+    dur = rint(380, 460);
   } else {
     pts = [a, [a[0], a[1] + 20], z];
-    dur = 240;
+    dur = rint(220, 270);
   }
   const b = document.getElementById("ball");
   const tris = ["tr0", "tr1", "tr2"].map(id => document.getElementById(id));
