@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "30";
+const GAME_VERSION = "31";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -431,6 +431,9 @@ function buildField() {
     '<path d="M195 292 L205 292 L205 298 L200 301 L195 298 Z" fill="#e8e8e8" stroke="#777"/>' +
     defs +
     [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => jersey("off" + i, "off", true)).join("") +
+    '<circle id="tr0" class="ptrail" r="2.6" style="opacity:0"></circle>' +
+    '<circle id="tr1" class="ptrail" r="2" style="opacity:0"></circle>' +
+    '<circle id="tr2" class="ptrail" r="1.5" style="opacity:0"></circle>' +
     '<circle id="ball" r="4" style="opacity:0"></circle>' +
     '</svg>';
 }
@@ -523,6 +526,66 @@ async function ballArc(from, to, dur, h) { // the ball sails through the air in 
     await glide(b, i === 0 ? from : [px(i / steps), py(i / steps)], [px((i + 1) / steps), py((i + 1) / steps)], dur / steps);
   }
   b.style.opacity = "0";
+}
+
+/* ---- the pitch itself: each offering flies its own way to the plate ---- */
+function quadPath(a, c, z, n) { // quadratic bezier: mound a, control c, plate z
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    pts.push([
+      u * u * a[0] + 2 * u * t * c[0] + t * t * z[0],
+      u * u * a[1] + 2 * u * t * c[1] + t * t * z[1]
+    ]);
+  }
+  return pts;
+}
+
+async function pitchFlight(type) {
+  // fastball: no break, straight and quick, growing at the hitter
+  // curve: a big bow that snaps back over the plate
+  // slider: rides straight, then bites hard to the glove side
+  const a = P.mound, z = P.home;
+  const OPS = [0.45, 0.3, 0.16];
+  let pts, dur;
+  if (type === "Curve") {
+    pts = quadPath(a, [a[0] + 60, a[1] + 24], z, 10);
+    dur = 620;
+  } else if (type === "Slider") {
+    pts = [];
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      const bite = -22 * Math.pow(t, 2.6);
+      pts.push([a[0] + (z[0] - a[0]) * t + bite, a[1] + (z[1] - a[1]) * t]);
+    }
+    dur = 430;
+  } else {
+    pts = [a, [a[0], a[1] + 20], z];
+    dur = 240;
+  }
+  const b = document.getElementById("ball");
+  const tris = ["tr0", "tr1", "tr2"].map(id => document.getElementById(id));
+  if (!b) { await wait(dur); return; }
+  b.style.transition = "none";
+  setXY(b, pts[0]);
+  b.style.opacity = "1";
+  await nextFrame();
+  const steps = pts.length - 1, per = dur / steps;
+  for (let i = 0; i < steps; i++) {
+    const grow = type === "Fastball" ? 1.15 + 0.35 * ((i + 1) / steps) : 1.15;
+    b.style.transition = "transform " + per + "ms linear";
+    setXY(b, pts[i + 1], grow);
+    await wait(per);
+    // lay a short trail behind the ball so the movement reads
+    tris.forEach((tr, k) => {
+      if (!tr || i < k) return; // the first steps have no trail yet
+      tr.style.transition = "none";
+      setXY(tr, pts[i - k], 1);
+      tr.style.opacity = String(OPS[k]);
+    });
+  }
+  b.style.opacity = "0";
+  tris.forEach(tr => { if (tr) tr.style.opacity = "0"; });
 }
 
 function catchAt(pos, defId, dur) {
@@ -813,7 +876,7 @@ async function resolvePitch(type) {
   const pRoll = await rollDie(20, "PITCH \u2014 " + lastName(pit.name) + " (d20)", userIsPitcher());
   S.lastSwing = { pRoll, pitch: type, pitchMod: pm, bRoll: null };
   log("PITCH: " + type + " \u2014 " + pit.name + " rolls " + pRoll + (pm ? (pm > 0 ? "+" : "") + pm : "") + " vs " + target);
-  await ballTo(P.mound, P.home, 450);
+  await pitchFlight(type); // each offering has its own flight to the plate
 
   if (pRoll + pm <= target) { // BALL
     await catchAt(P.home, "defC", 200);

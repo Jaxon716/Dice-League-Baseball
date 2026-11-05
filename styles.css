@@ -394,6 +394,9 @@ body {
 
 #ball { fill: #fff; stroke: #777; stroke-width: 1; }
 
+/* pitch trail — a short streak behind the ball so curve/slider break reads */
+.ptrail { fill: #dfe9f0; }
+
 
 /* ---------- Field stage ---------- */
 #fieldstage { position: relative; }
