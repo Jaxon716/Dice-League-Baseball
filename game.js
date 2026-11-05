@@ -5,7 +5,7 @@
    "Pen & Paper Baseball" rules, played with real MLB teams.
    ===================================================================== */
 
-const GAME_VERSION = "33";
+const GAME_VERSION = "34";
 
 /* ================= MLB teams, markets, colors ================= */
 
@@ -569,6 +569,21 @@ function quadPath(a, c, z, n) { // quadratic bezier: mound a, control c, plate z
   return pts;
 }
 
+/* how wide fair territory is at a given depth — the foul-line wedge,
+   widened around home by the dirt circle, so a breaking ball can never
+   stray outside the field and come back in */
+function fieldRoom(y) {
+  const wedge = 183 * Math.max(0, Math.min(1, (295 - y) / 171));
+  const dy = y - 292;
+  const dirt = dy * dy < 784 ? Math.sqrt(784 - dy * dy) : 0;
+  return Math.max(wedge, dirt);
+}
+
+function clampFair(pt) { // keep every point of a pitch inside the field
+  const lim = Math.max(6, fieldRoom(pt[1]) - 4);
+  return [Math.max(200 - lim, Math.min(200 + lim, pt[0])), pt[1]];
+}
+
 /* breaking-ball shape: the pitcher's hand sets the natural side (a RHP's
    breaker runs to screen right), with the odd backdoor/backup curve going
    the other way. Size and bite vary pitch to pitch. */
@@ -578,8 +593,8 @@ function breakShape(type) {
   const back = rint(1, 100) <= backChance;
   return {
     side: back ? -hand : hand,
-    apex: rint(22, 40),
-    bite: rint(12, 22)
+    apex: rint(10, 20),
+    bite: rint(8, 14)
   };
 }
 
@@ -620,6 +635,7 @@ async function pitchFlight(type) {
     pts = [a, [a[0], a[1] + 20], z];
     dur = rint(220, 270);
   }
+  pts = pts.map(clampFair); // the break stays on the field, never out and back
   const b = document.getElementById("ball");
   const tris = ["tr0", "tr1", "tr2"].map(id => document.getElementById(id));
   if (!b) { await wait(dur); return; }
